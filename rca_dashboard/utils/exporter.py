@@ -18,4 +18,3 @@ def generate_excel_output(filtered_df, trend_bulanan, total_bulanan, avg_mttr, p
 
     output.seek(0)
     return output
-

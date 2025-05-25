@@ -40,35 +40,61 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     sns.heatmap(pivot, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
     st.pyplot(fig3)
 
-    st.subheader("📉 Grafik Year-over-Year (YOY) Growth per Bulan")
-    fig_yoy, ax_yoy = plt.subplots(figsize=(12, 6))
-    ax_yoy.plot(total_bulanan['bulan_label'], total_bulanan['yoy_growth_%'], marker='o', linestyle='-')
-    ax_yoy.axhline(0, color='gray', linewidth=0.8, linestyle='--')
-    ax_yoy.set_xlabel("Bulan")
-    ax_yoy.set_ylabel("YOY Growth (%)")
-    ax_yoy.set_title("Trend YOY Growth Kasus per Bulan")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    st.pyplot(fig_yoy)
+    st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")
 
-    st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Bulan")
+    # Agregasi total kasus per kuartal
+    quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()
+    quarterly['year'] = quarterly['quarter'].dt.year
+    quarterly['quarter_num'] = quarterly['quarter'].dt.quarter
+    quarterly['qoq_growth_%'] = quarterly['total_count'].pct_change() * 100
+
+    # Filter tahun terakhir dan tahun sebelumnya
+    tahun_terakhir = quarterly['year'].max()
+    data_tahun_ini = quarterly[quarterly['year'] == tahun_terakhir].copy()
+    data_tahun_lalu = quarterly[quarterly['year'] == tahun_terakhir - 1].copy()
+
+    # Buat label kuartal (misal 'Q1', 'Q2', dst) untuk x-axis
+    data_tahun_ini['quarter_label'] = 'Q' + data_tahun_ini['quarter_num'].astype(str)
+    data_tahun_lalu['quarter_label'] = 'Q' + data_tahun_lalu['quarter_num'].astype(str)
+
     fig_qoq, ax_qoq = plt.subplots(figsize=(12, 6))
-    ax_qoq.plot(total_bulanan['bulan_label'], total_bulanan['qoq_growth_%'], marker='o', linestyle='-', color='orange')
+
+    # Plot line untuk tahun ini (QOQ growth)
+    ax_qoq.plot(
+        data_tahun_ini['quarter_label'],
+        data_tahun_ini['qoq_growth_%'],
+        marker='o', linestyle='-', color='orange', label=f'QOQ Growth Tahun {tahun_terakhir}'
+    )
+    # Label angka tahun ini
+    for x, y in zip(data_tahun_ini['quarter_label'], data_tahun_ini['qoq_growth_%']):
+        ax_qoq.text(x, y, f"{y:.1f}%", fontsize=9, ha='center', va='bottom', color='orange')
+
+    # Plot line untuk tahun lalu (QOQ growth)
+    ax_qoq.plot(
+        data_tahun_lalu['quarter_label'],
+        data_tahun_lalu['qoq_growth_%'],
+        marker='o', linestyle='--', color='gray', label=f'QOQ Growth Tahun {tahun_terakhir - 1}'
+    )
+    # Label angka tahun lalu
+    for x, y in zip(data_tahun_lalu['quarter_label'], data_tahun_lalu['qoq_growth_%']):
+        ax_qoq.text(x, y, f"{y:.1f}%", fontsize=9, ha='center', va='bottom', color='gray')
+
     ax_qoq.axhline(0, color='gray', linewidth=0.8, linestyle='--')
-    ax_qoq.set_xlabel("Bulan")
+    ax_qoq.set_xlabel("Kuartal")
     ax_qoq.set_ylabel("QOQ Growth (%)")
-    ax_qoq.set_title("Trend QOQ Growth Kasus per Bulan")
+    ax_qoq.set_title("Trend QOQ Growth Kasus per Kuartal: Tahun Ini vs Tahun Lalu")
     plt.xticks(rotation=45)
     plt.grid(True)
+    ax_qoq.legend()
     st.pyplot(fig_qoq)
 
-    # Tambahan: Komparasi Tahun Ini vs Tahun Lalu (Jumlah Kasus per Bulan)
+    # Komparasi Tahun Ini vs Tahun Lalu (Jumlah Kasus per Bulan)
     st.subheader("📈 Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY)")
-    tahun_terakhir = total_bulanan['bulan_label'].iloc[-1].split()[-1]  # ambil tahun terakhir dari label bulan
-    tahun_terakhir = int(tahun_terakhir)
+    tahun_terakhir_label = total_bulanan['bulan_label'].iloc[-1].split()[-1]  # ambil tahun terakhir dari label bulan
+    tahun_terakhir_label = int(tahun_terakhir_label)
 
-    tahun_ini = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir))].copy()
-    tahun_lalu = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir - 1))].copy()
+    tahun_ini = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir_label))].copy()
+    tahun_lalu = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir_label - 1))].copy()
 
     # Ekstrak nama bulan untuk sorting kronologis
     bulan_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -81,8 +107,15 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     tahun_lalu.sort_values('bulan_short', inplace=True)
 
     fig_compare, ax_compare = plt.subplots(figsize=(12, 6))
-    ax_compare.plot(tahun_lalu['bulan_short'], tahun_lalu['total_count'], marker='o', label=f"Tahun {tahun_terakhir - 1}", color='gray')
-    ax_compare.plot(tahun_ini['bulan_short'], tahun_ini['total_count'], marker='o', label=f"Tahun {tahun_terakhir}", color='blue')
+    ax_compare.plot(tahun_lalu['bulan_short'], tahun_lalu['total_count'], marker='o', label=f"Tahun {tahun_terakhir_label - 1}", color='gray')
+    ax_compare.plot(tahun_ini['bulan_short'], tahun_ini['total_count'], marker='o', label=f"Tahun {tahun_terakhir_label}", color='blue')
+
+    # Tambahkan label angka pada titik data
+    for x, y in zip(tahun_lalu['bulan_short'], tahun_lalu['total_count']):
+        ax_compare.text(x, y, f"{y}", fontsize=9, ha='center', va='bottom', color='gray')
+    for x, y in zip(tahun_ini['bulan_short'], tahun_ini['total_count']):
+        ax_compare.text(x, y, f"{y}", fontsize=9, ha='center', va='bottom', color='blue')
+
     ax_compare.set_xlabel("Bulan")
     ax_compare.set_ylabel("Jumlah Kasus")
     ax_compare.set_title("Komparasi Jumlah Kasus per Bulan: Tahun Ini vs Tahun Lalu")

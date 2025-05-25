@@ -9,7 +9,7 @@ st.title("📊 Gabungkan Beberapa File Excel")
 # Upload file
 uploaded_files = st.file_uploader(
     "Pilih satu atau beberapa file Excel (.xlsx atau .xls)",
-    type=["xlsx", "xls", "csv"],
+    type=["xlsx", "xls"],
     accept_multiple_files=True
 )
 

@@ -28,27 +28,27 @@ if uploaded_file:
         st.warning("Kolom 'bulan_label' tidak ditemukan di data.")
         st.stop()
 
-    # # Filter tahun dulu
-    # available_tahun = sorted(filtered_df['tahun'].dropna().unique())
-    # selected_tahun = st.multiselect(
-    #     "Filter berdasarkan Tahun:",
-    #     options=available_tahun,
-    #     default=available_tahun
-    # )
+    # Filter tahun dulu
+    available_tahun = sorted(filtered_df['tahun'].dropna().unique())
+    selected_tahun = st.multiselect(
+        "Filter berdasarkan Tahun:",
+        options=available_tahun,
+        default=available_tahun
+    )
 
-    # filtered_df = filtered_df[filtered_df['tahun'].isin(selected_tahun)]
+    filtered_df = filtered_df[filtered_df['tahun'].isin(selected_tahun)]
 
-    # if filtered_df.empty:
-    #     st.warning("⚠️ Tidak ada data setelah filter Tahun diterapkan.")
-    #     st.stop()
+    if filtered_df.empty:
+        st.warning("⚠️ Tidak ada data setelah filter Tahun diterapkan.")
+        st.stop()
 
-    # # Filter bulan berdasar pilihan tahun
-    # available_bulan = sorted(filtered_df['bulan'].dropna().unique())
-    # selected_bulan = st.multiselect(
-    #     "Filter berdasarkan Bulan:",
-    #     options=available_bulan,
-    #     default=available_bulan
-    # )
+    # Filter bulan berdasar pilihan tahun
+    available_bulan = sorted(filtered_df['bulan'].dropna().unique())
+    selected_bulan = st.multiselect(
+        "Filter berdasarkan Bulan:",
+        options=available_bulan,
+        default=available_bulan
+    )
 
     # filtered_df = filtered_df[filtered_df['bulan'].isin(selected_bulan)]
 

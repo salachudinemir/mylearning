@@ -10,7 +10,9 @@ Dashboard interaktif untuk analisis Root Cause (RCA) gangguan jaringan menggunak
    cd rca_dashboard
 
 2. Install dependencies:
+   ```bash
    pip install -r requirements.txt
    
-3. Jalankan aplikasi Streamlit:
+4. Jalankan aplikasi Streamlit:
+      ```bash
    streamlit run app.py

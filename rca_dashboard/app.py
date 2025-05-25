@@ -28,32 +28,66 @@ if uploaded_file:
         st.warning("Kolom 'bulan_label' tidak ditemukan di data.")
         st.stop()
 
-    # Filter tahun dulu
-    available_tahun = sorted(filtered_df['tahun'].dropna().unique())
-    selected_tahun = st.multiselect(
-        "Filter berdasarkan Tahun:",
-        options=available_tahun,
-        default=available_tahun
-    )
+    # # Filter tahun dulu
+    # available_tahun = sorted(filtered_df['tahun'].dropna().unique())
+    # selected_tahun = st.multiselect(
+    #     "Filter berdasarkan Tahun:",
+    #     options=available_tahun,
+    #     default=available_tahun
+    # )
 
-    filtered_df = filtered_df[filtered_df['tahun'].isin(selected_tahun)]
+    # filtered_df = filtered_df[filtered_df['tahun'].isin(selected_tahun)]
 
-    if filtered_df.empty:
-        st.warning("⚠️ Tidak ada data setelah filter Tahun diterapkan.")
-        st.stop()
+    # if filtered_df.empty:
+    #     st.warning("⚠️ Tidak ada data setelah filter Tahun diterapkan.")
+    #     st.stop()
 
-    # Filter bulan berdasar pilihan tahun
-    available_bulan = sorted(filtered_df['bulan'].dropna().unique())
-    selected_bulan = st.multiselect(
-        "Filter berdasarkan Bulan:",
-        options=available_bulan,
-        default=available_bulan
-    )
+    # # Filter bulan berdasar pilihan tahun
+    # available_bulan = sorted(filtered_df['bulan'].dropna().unique())
+    # selected_bulan = st.multiselect(
+    #     "Filter berdasarkan Bulan:",
+    #     options=available_bulan,
+    #     default=available_bulan
+    # )
 
     # filtered_df = filtered_df[filtered_df['bulan'].isin(selected_bulan)]
 
+    # if filtered_df.empty:
+    #     st.warning("⚠️ Tidak ada data setelah filter Bulan diterapkan.")
+    #     st.stop()
+
+    # Pastikan ada kolom datetime dari bulan_label
+    filtered_df['bulan_label_dt'] = pd.to_datetime(filtered_df['bulan_label'], format='%b %Y', errors='coerce')
+
+    # Buat dataframe unik bulan_label dengan kolom datetime
+    bulan_label_df = filtered_df[['bulan_label', 'bulan_label_dt']].drop_duplicates()
+
+    # Urutkan dari terlama ke terbaru berdasarkan datetime
+    bulan_label_df = bulan_label_df.sort_values('bulan_label_dt')
+
+    # Ambil list bulan_label yang sudah terurut
+    available_bulan_label = bulan_label_df['bulan_label'].tolist()
+
+    # Checkbox untuk Select All
+    select_all_bulan = st.checkbox("Pilih Semua Bulan & Tahun", value=True)
+
+    if select_all_bulan:
+        selected_bulan_label = st.multiselect(
+            "Filter berdasarkan Bulan & Tahun (contoh: Jan 2024):",
+            options=available_bulan_label,
+            default=available_bulan_label  # semua otomatis terpilih
+        )
+    else:
+        selected_bulan_label = st.multiselect(
+            "Filter berdasarkan Bulan & Tahun (contoh: Jan 2024):",
+            options=available_bulan_label,
+            default=[]  # tidak ada yang dipilih defaultnya
+        )
+
+    filtered_df = filtered_df[filtered_df['bulan_label'].isin(selected_bulan_label)]
+
     if filtered_df.empty:
-        st.warning("⚠️ Tidak ada data setelah filter Bulan diterapkan.")
+        st.warning("⚠️ Tidak ada data setelah filter Bulan & Tahun diterapkan.")
         st.stop()
 
     # Filter Severity

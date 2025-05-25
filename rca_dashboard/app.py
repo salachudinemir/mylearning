@@ -18,7 +18,7 @@ if uploaded_file:
         st.error(f"Terjadi kesalahan saat memproses file: {e}")
         st.stop()
 
-    # Cek kolom severity
+    # Filter berdasarkan Severity
     if 'severity' in filtered_df.columns:
         available_severities = sorted(filtered_df['severity'].dropna().unique())
         selected_severity = st.multiselect(
@@ -26,7 +26,6 @@ if uploaded_file:
             options=available_severities,
             default=available_severities
         )
-
         filtered_df = filtered_df[filtered_df['severity'].isin(selected_severity)]
 
         if filtered_df.empty:
@@ -34,6 +33,23 @@ if uploaded_file:
             st.stop()
     else:
         st.warning("Kolom 'severity' tidak ditemukan di data.")
+        st.stop()
+
+    # Filter berdasarkan RCA
+    if 'rca' in filtered_df.columns:
+        available_rca = sorted(filtered_df['rca'].dropna().unique())
+        selected_rca = st.multiselect(
+            "Filter berdasarkan RCA:",
+            options=available_rca,
+            default=available_rca
+        )
+        filtered_df = filtered_df[filtered_df['rca'].isin(selected_rca)]
+
+        if filtered_df.empty:
+            st.warning("⚠️ Tidak ada data setelah filter RCA diterapkan.")
+            st.stop()
+    else:
+        st.warning("Kolom 'rca' tidak ditemukan di data.")
         st.stop()
 
     # Tambahkan kolom total_count jika belum ada
@@ -58,16 +74,15 @@ if uploaded_file:
     # Visualisasi
     show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan)
 
-    # Modeling (jika memungkinkan)
+    # Modeling
     y_test, y_pred = show_model_results(filtered_df)
 
+    # Export Excel, hanya jika model berhasil dijalankan (y_test, y_pred bukan None)
     if y_test is not None and y_pred is not None:
-        # Export Excel jika model berhasil dijalankan
         excel_output = generate_excel_output(
             filtered_df, trend_bulanan, total_bulanan, avg_mttr, pivot, y_test, y_pred
         )
     else:
-        # Jika model tidak jalan, tetap buat export tanpa hasil model
         excel_output = generate_excel_output(
             filtered_df, trend_bulanan, total_bulanan, avg_mttr, pivot, None, None
         )

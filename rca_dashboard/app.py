@@ -18,7 +18,45 @@ if uploaded_file:
         st.error(f"Terjadi kesalahan saat memproses file: {e}")
         st.stop()
 
-    # Filter berdasarkan Severity
+    # Pastikan kolom 'bulan_label' ada dan ubah ke datetime
+    if 'bulan_label' in filtered_df.columns:
+        filtered_df['bulan_label_dt'] = pd.to_datetime(filtered_df['bulan_label'], format='%b %Y', errors='coerce')
+        # Ambil tahun dan bulan (nama bulan)
+        filtered_df['tahun'] = filtered_df['bulan_label_dt'].dt.year.astype('Int64')
+        filtered_df['bulan'] = filtered_df['bulan_label_dt'].dt.strftime('%b')
+    else:
+        st.warning("Kolom 'bulan_label' tidak ditemukan di data.")
+        st.stop()
+
+    # Filter tahun dulu
+    available_tahun = sorted(filtered_df['tahun'].dropna().unique())
+    selected_tahun = st.multiselect(
+        "Filter berdasarkan Tahun:",
+        options=available_tahun,
+        default=available_tahun
+    )
+
+    filtered_df = filtered_df[filtered_df['tahun'].isin(selected_tahun)]
+
+    if filtered_df.empty:
+        st.warning("⚠️ Tidak ada data setelah filter Tahun diterapkan.")
+        st.stop()
+
+    # Filter bulan berdasar pilihan tahun
+    available_bulan = sorted(filtered_df['bulan'].dropna().unique())
+    selected_bulan = st.multiselect(
+        "Filter berdasarkan Bulan:",
+        options=available_bulan,
+        default=available_bulan
+    )
+
+    filtered_df = filtered_df[filtered_df['bulan'].isin(selected_bulan)]
+
+    if filtered_df.empty:
+        st.warning("⚠️ Tidak ada data setelah filter Bulan diterapkan.")
+        st.stop()
+
+    # Filter Severity
     if 'severity' in filtered_df.columns:
         available_severities = sorted(filtered_df['severity'].dropna().unique())
         selected_severity = st.multiselect(
@@ -35,7 +73,7 @@ if uploaded_file:
         st.warning("Kolom 'severity' tidak ditemukan di data.")
         st.stop()
 
-    # Filter berdasarkan RCA
+    # Filter RCA
     if 'rca' in filtered_df.columns:
         available_rca = sorted(filtered_df['rca'].dropna().unique())
         selected_rca = st.multiselect(
@@ -56,14 +94,8 @@ if uploaded_file:
     if 'total_count' not in filtered_df.columns:
         filtered_df['total_count'] = 1
 
-    # Format kolom bulan_label dan buat quarter
-    if 'bulan_label' in filtered_df.columns:
-        filtered_df['bulan_label'] = pd.to_datetime(filtered_df['bulan_label'], format='%b %Y', errors='coerce')
-        filtered_df['quarter'] = filtered_df['bulan_label'].dt.to_period('Q').dt.to_timestamp()
-        filtered_df['bulan_label'] = filtered_df['bulan_label'].dt.strftime('%b %Y')
-    else:
-        st.error("Kolom 'bulan_label' tidak ditemukan di data.")
-        st.stop()
+    # Buat kolom quarter
+    filtered_df['quarter'] = filtered_df['bulan_label_dt'].dt.to_period('Q').dt.to_timestamp()
 
     # Hitung ulang agregasi berdasarkan data yang sudah difilter
     trend_bulanan = filtered_df.groupby(['bulan_label', 'rca']).size().reset_index(name='count')
@@ -77,7 +109,7 @@ if uploaded_file:
     # Modeling
     y_test, y_pred = show_model_results(filtered_df)
 
-    # Export Excel, hanya jika model berhasil dijalankan (y_test, y_pred bukan None)
+    # Export Excel
     if y_test is not None and y_pred is not None:
         excel_output = generate_excel_output(
             filtered_df, trend_bulanan, total_bulanan, avg_mttr, pivot, y_test, y_pred

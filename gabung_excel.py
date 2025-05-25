@@ -1,25 +1,35 @@
-# simpan file ini sebagai gabung_excel_app.py lalu jalankan: streamlit run gabung_excel_app.py
-
 import streamlit as st
 import pandas as pd
-from io import BytesIO
+from io import BytesIO, StringIO
 
-st.title("📊 Gabungkan Beberapa File Excel")
+st.title("📊 Gabungkan dan Rapihkan Beberapa File Excel / CSV")
 
-# Upload file
 uploaded_files = st.file_uploader(
-    "Pilih satu atau beberapa file Excel (.xlsx atau .xls)",
-    type=["xlsx", "xls"],
+    "Pilih satu atau beberapa file Excel (.xlsx, .xls) atau CSV (.csv)",
+    type=["xlsx", "xls", "csv"],
     accept_multiple_files=True
 )
 
+def clean_dataframe(df):
+    # Contoh rapihkan nama kolom (strip spasi)
+    df.columns = df.columns.str.strip()
+    # Contoh parsing tanggal jika ada kolom dt_id dan createfaultfirstoccurtime
+    for col in ['dt_id', 'createfaultfirstoccurtime', 'faultrecoverytime']:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+    # Kamu bisa tambahkan step parsing lain di sini
+    return df
+
 if uploaded_files:
     all_data = []
-
     for file in uploaded_files:
         try:
-            df = pd.read_excel(file)
-            df['Sumber_File'] = file.name  # Tambah kolom sumber file
+            if file.name.endswith('.csv'):
+                df = pd.read_csv(file)
+            else:
+                df = pd.read_excel(file)
+            df = clean_dataframe(df)
+            df['Sumber_File'] = file.name
             all_data.append(df)
             st.success(f"✅ Berhasil memuat: {file.name}")
         except Exception as e:
@@ -27,11 +37,9 @@ if uploaded_files:
 
     if all_data:
         combined_df = pd.concat(all_data, ignore_index=True)
+        st.subheader("📋 Preview Data Gabungan dan Rapih")
+        st.dataframe(combined_df.head(20))
 
-        st.subheader("📋 Preview Data Gabungan")
-        st.dataframe(combined_df.head())
-
-        # Simpan ke Excel dan tawarkan unduhan
         output = BytesIO()
         combined_df.to_excel(output, index=False)
         output.seek(0)
@@ -39,8 +47,8 @@ if uploaded_files:
         st.download_button(
             label="💾 Unduh Hasil Gabungan sebagai Excel",
             data=output,
-            file_name="data_gabungan.xlsx",
+            file_name="data_gabungan_rapih.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 else:
-    st.info("⬆️ Unggah file Excel terlebih dahulu untuk mulai.")
+    st.info("⬆️ Unggah file Excel atau CSV terlebih dahulu untuk mulai.")

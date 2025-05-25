@@ -1,6 +1,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 
 def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
     st.subheader("📈 Trend Distribusi RCA per Bulan")
@@ -60,3 +61,31 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     plt.xticks(rotation=45)
     plt.grid(True)
     st.pyplot(fig_qoq)
+
+    # Tambahan: Komparasi Tahun Ini vs Tahun Lalu (Jumlah Kasus per Bulan)
+    st.subheader("📈 Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY)")
+    tahun_terakhir = total_bulanan['bulan_label'].iloc[-1].split()[-1]  # ambil tahun terakhir dari label bulan
+    tahun_terakhir = int(tahun_terakhir)
+
+    tahun_ini = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir))].copy()
+    tahun_lalu = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir - 1))].copy()
+
+    # Ekstrak nama bulan untuk sorting kronologis
+    bulan_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    tahun_ini['bulan_short'] = tahun_ini['bulan_label'].str[:3]
+    tahun_ini['bulan_short'] = pd.Categorical(tahun_ini['bulan_short'], categories=bulan_order, ordered=True)
+    tahun_lalu['bulan_short'] = tahun_lalu['bulan_label'].str[:3]
+    tahun_lalu['bulan_short'] = pd.Categorical(tahun_lalu['bulan_short'], categories=bulan_order, ordered=True)
+
+    tahun_ini.sort_values('bulan_short', inplace=True)
+    tahun_lalu.sort_values('bulan_short', inplace=True)
+
+    fig_compare, ax_compare = plt.subplots(figsize=(12, 6))
+    ax_compare.plot(tahun_lalu['bulan_short'], tahun_lalu['total_count'], marker='o', label=f"Tahun {tahun_terakhir - 1}", color='gray')
+    ax_compare.plot(tahun_ini['bulan_short'], tahun_ini['total_count'], marker='o', label=f"Tahun {tahun_terakhir}", color='blue')
+    ax_compare.set_xlabel("Bulan")
+    ax_compare.set_ylabel("Jumlah Kasus")
+    ax_compare.set_title("Komparasi Jumlah Kasus per Bulan: Tahun Ini vs Tahun Lalu")
+    ax_compare.legend()
+    plt.grid(True)
+    st.pyplot(fig_compare)

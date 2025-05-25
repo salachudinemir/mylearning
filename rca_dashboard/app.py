@@ -93,11 +93,22 @@ if uploaded_file:
     # Filter Severity
     if 'severity' in filtered_df.columns:
         available_severities = sorted(filtered_df['severity'].dropna().unique())
-        selected_severity = st.multiselect(
-            "Filter berdasarkan Severity:",
-            options=available_severities,
-            default=available_severities
-        )
+        
+        select_all_severity = st.checkbox("Pilih Semua Severity", value=True)
+        
+        if select_all_severity:
+            selected_severity = st.multiselect(
+                "Filter berdasarkan Severity:",
+                options=available_severities,
+                default=available_severities
+            )
+        else:
+            selected_severity = st.multiselect(
+                "Filter berdasarkan Severity:",
+                options=available_severities,
+                default=[]
+            )
+        
         filtered_df = filtered_df[filtered_df['severity'].isin(selected_severity)]
 
         if filtered_df.empty:
@@ -110,11 +121,22 @@ if uploaded_file:
     # Filter RCA
     if 'rca' in filtered_df.columns:
         available_rca = sorted(filtered_df['rca'].dropna().unique())
-        selected_rca = st.multiselect(
-            "Filter berdasarkan RCA:",
-            options=available_rca,
-            default=available_rca
-        )
+        
+        select_all_rca = st.checkbox("Pilih Semua RCA", value=True)
+        
+        if select_all_rca:
+            selected_rca = st.multiselect(
+                "Filter berdasarkan RCA:",
+                options=available_rca,
+                default=available_rca
+            )
+        else:
+            selected_rca = st.multiselect(
+                "Filter berdasarkan RCA:",
+                options=available_rca,
+                default=[]
+            )
+        
         filtered_df = filtered_df[filtered_df['rca'].isin(selected_rca)]
 
         if filtered_df.empty:
@@ -123,6 +145,7 @@ if uploaded_file:
     else:
         st.warning("Kolom 'rca' tidak ditemukan di data.")
         st.stop()
+
 
     # Tambahkan kolom total_count jika belum ada
     if 'total_count' not in filtered_df.columns:

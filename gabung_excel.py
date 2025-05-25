@@ -1,36 +1,46 @@
-import os
+# simpan file ini sebagai gabung_excel_app.py lalu jalankan: streamlit run gabung_excel_app.py
+
+import streamlit as st
 import pandas as pd
-from tkinter import Tk, filedialog
+from io import BytesIO
 
-# Sembunyikan jendela utama
-root = Tk()
-root.withdraw()
+st.title("📊 Gabungkan Beberapa File Excel")
 
-# Dialog interaktif: pilih beberapa file Excel
-file_paths = filedialog.askopenfilenames(
-    title='Pilih Beberapa File Excel untuk Digabung',
-    filetypes=[("Excel files", "*.xlsx *.xls")]
+# Upload file
+uploaded_files = st.file_uploader(
+    "Pilih satu atau beberapa file Excel (.xlsx atau .xls)",
+    type=["xlsx", "xls"],
+    accept_multiple_files=True
 )
 
-# Validasi input
-if not file_paths:
-    print("❌ Tidak ada file yang dipilih. Program dihentikan.")
-else:
+if uploaded_files:
     all_data = []
 
-    for file_path in file_paths:
-        file_name = os.path.basename(file_path)
-        print(f"📄 Menggabungkan file: {file_name}")
-        df = pd.read_excel(file_path)
-        df['Sumber_File'] = file_name  # Menambahkan kolom asal file
-        all_data.append(df)
+    for file in uploaded_files:
+        try:
+            df = pd.read_excel(file)
+            df['Sumber_File'] = file.name  # Tambah kolom sumber file
+            all_data.append(df)
+            st.success(f"✅ Berhasil memuat: {file.name}")
+        except Exception as e:
+            st.error(f"❌ Gagal membaca {file.name}: {e}")
 
-    # Gabungkan semua DataFrame
-    combined_data = pd.concat(all_data, ignore_index=True)
+    if all_data:
+        combined_df = pd.concat(all_data, ignore_index=True)
 
-    # Simpan hasil gabungan ke file baru
-    output_dir = os.path.dirname(file_paths[0])
-    output_path = os.path.join(output_dir, 'data_gabungan.xlsx')
-    combined_data.to_excel(output_path, index=False)
+        st.subheader("📋 Preview Data Gabungan")
+        st.dataframe(combined_df.head())
 
-    print(f"\n✅ Semua data berhasil digabungkan ke dalam file: {output_path}")
+        # Simpan ke Excel dan tawarkan unduhan
+        output = BytesIO()
+        combined_df.to_excel(output, index=False)
+        output.seek(0)
+
+        st.download_button(
+            label="💾 Unduh Hasil Gabungan sebagai Excel",
+            data=output,
+            file_name="data_gabungan.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+else:
+    st.info("⬆️ Unggah file Excel terlebih dahulu untuk mulai.")

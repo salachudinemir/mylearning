@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import numpy as np  # untuk handling NaN di tabel
 import matplotlib.dates as mdates  # tambahan untuk format tanggal di plot
 
 def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
@@ -9,9 +10,7 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     st.subheader("📈 Trend Distribusi RCA per Bulan")
 
     # 1. Ubah 'bulan_label' ke datetime untuk sorting dan plotting
-    # Asumsi format 'Jan 2023', 'Feb 2023', dll
     trend_bulanan['date'] = pd.to_datetime(trend_bulanan['bulan_label'], format='%b %Y')
-
     # 2. Urutkan berdasarkan tanggal
     trend_bulanan = trend_bulanan.sort_values('date')
 
@@ -24,8 +23,6 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     ax_trend.set_ylabel("Jumlah Kasus RCA")
     ax_trend.set_title("Trend RCA per Bulan")
     ax_trend.legend(title='RCA', bbox_to_anchor=(1.05, 1), loc='upper left')
-
-    # Format tanggal sumbu x agar tampil "Jan 2023", "Feb 2023", ...
     ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
     plt.xticks(rotation=45)
     plt.tight_layout()
@@ -91,6 +88,25 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     ax_qoq.legend()
     st.pyplot(fig_qoq)
 
+    # --- Tabel QOQ Growth ---
+    st.subheader("📊 Tabel Quarter-over-Quarter (QOQ) Growth per Kuartal")
+    tabel_qoq = pd.merge(
+        data_tahun_ini[['quarter_label', 'total_count', 'qoq_growth_%']],
+        data_tahun_lalu[['quarter_label', 'total_count', 'qoq_growth_%']],
+        on='quarter_label',
+        how='outer',
+        suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_terakhir - 1}')
+    )
+    # Pastikan tidak ada string '-' di kolom angka, pakai np.nan
+    tabel_qoq = tabel_qoq.replace('-', np.nan)
+
+    st.dataframe(tabel_qoq.style.format({
+        f'total_count Tahun {tahun_terakhir}': '{:,.0f}',
+        f'qoq_growth_% Tahun {tahun_terakhir}': '{:.2f}%',
+        f'total_count Tahun {tahun_terakhir - 1}': '{:,.0f}',
+        f'qoq_growth_% Tahun {tahun_terakhir - 1}': '{:.2f}%'
+    }))
+
     # --- Komparasi Tahun Ini vs Tahun Lalu (Jumlah Kasus per Bulan) ---
     st.subheader("📈 Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY)")
     tahun_terakhir = total_bulanan['bulan_label'].iloc[-1].split()[-1]  # ambil tahun terakhir dari label bulan
@@ -117,3 +133,27 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     ax_compare.legend()
     plt.grid(True)
     st.pyplot(fig_compare)
+
+    # --- Tabel YOY Growth ---
+    st.subheader("📊 Tabel Year-over-Year (YOY) Growth per Bulan")
+
+    tabel_yoy = pd.merge(
+        tahun_ini[['bulan_short', 'total_count']],
+        tahun_lalu[['bulan_short', 'total_count']],
+        on='bulan_short',
+        how='outer',
+        suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_terakhir - 1}')
+    )
+
+    # Hitung growth YOY (%)
+    tabel_yoy['Growth YOY (%)'] = ((tabel_yoy[f'total_count Tahun {tahun_terakhir}'] - tabel_yoy[f'total_count Tahun {tahun_terakhir - 1}'])
+                                  / tabel_yoy[f'total_count Tahun {tahun_terakhir - 1}']) * 100
+
+    # Ganti inf dan NaN yang mungkin muncul akibat pembagian nol dengan np.nan
+    tabel_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    st.dataframe(tabel_yoy.style.format({
+        f'total_count Tahun {tahun_terakhir}': '{:,.0f}',
+        f'total_count Tahun {tahun_terakhir - 1}': '{:,.0f}',
+        'Growth YOY (%)': '{:.2f}%'
+    }))

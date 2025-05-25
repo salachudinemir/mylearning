@@ -10,17 +10,17 @@ import pandas as pd
 def show_model_results(filtered_df):
     df_enc = filtered_df.copy()
 
-    # Cek duplikat kolom (kalau ada, tambahkan suffix)
+    # Cek duplikat kolom
     if df_enc.columns.duplicated().any():
         st.warning("Ada kolom duplikat, akan diubah namanya.")
-        df_enc = df_enc.loc[:,~df_enc.columns.duplicated()]  # Drop kolom duplikat langsung
+        df_enc = df_enc.loc[:, ~df_enc.columns.duplicated()]
 
-    # Drop kolom datetime jika ada
+    # Drop kolom datetime
     datetime_cols = df_enc.select_dtypes(include=['datetime64[ns]', 'datetime64[ns, UTC]']).columns.tolist()
     if datetime_cols:
         df_enc = df_enc.drop(columns=datetime_cols)
 
-    # Encode semua kolom object atau kategorikal yang tersisa
+    # Encode semua kolom object atau kategorikal
     le_dict = {}
     for col in df_enc.columns:
         if pd.api.types.is_object_dtype(df_enc[col]) or pd.api.types.is_categorical_dtype(df_enc[col]):
@@ -33,9 +33,9 @@ def show_model_results(filtered_df):
     X = df_enc.drop(columns=drop_cols, errors='ignore')
     y = df_enc['rca']
 
-    # Cek lagi kolom bertipe object di fitur
+    # Cek object di fitur
     if X.select_dtypes(include=['object']).shape[1] > 0:
-        st.error("Masih ada kolom bertipe object di fitur, harap encode semua kolom tersebut terlebih dahulu!")
+        st.error("Masih ada kolom bertipe object di fitur.")
         st.write(X.select_dtypes(include=['object']).columns.tolist())
         return None, None
 
@@ -43,6 +43,14 @@ def show_model_results(filtered_df):
         st.warning("⚠️ Data terlalu sedikit untuk pelatihan model.")
         return None, None
 
+    # Validasi stratifikasi: setidaknya 2 data per kelas
+    class_counts = y.value_counts()
+    if (class_counts < 2).any():
+        st.warning("❗ Beberapa kelas RCA hanya memiliki 1 data. Tidak cukup untuk pelatihan model.")
+        st.write(class_counts[class_counts < 2])
+        return None, None
+
+    # Train model
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
@@ -59,7 +67,7 @@ def show_model_results(filtered_df):
     cm = confusion_matrix(y_test, y_pred)
     labels = le_dict['rca'].classes_ if 'rca' in le_dict else sorted(filtered_df['rca'].unique())
 
-    fig, ax = plt.subplots(figsize=(8,6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels, ax=ax)
     ax.set_xlabel('Predicted')
     ax.set_ylabel('Actual')

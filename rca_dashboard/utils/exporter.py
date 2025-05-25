@@ -5,16 +5,24 @@ from sklearn.metrics import classification_report
 def generate_excel_output(filtered_df, trend_bulanan, total_bulanan, avg_mttr, pivot, y_test, y_pred):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        filtered_df.to_excel(writer, index=False, sheet_name='Filtered RCA Data')
-        trend_bulanan.to_excel(writer, index=False, sheet_name='Trend RCA Bulanan')
-        total_bulanan.to_excel(writer, index=False, sheet_name='YOY_QOQ Growth')
-        avg_mttr.to_frame(name='Average_MTTR').to_excel(writer, sheet_name='Average MTTR')
-        pivot.to_excel(writer, sheet_name='Heatmap RCA vs Severity')
+        filtered_df.to_excel(writer, sheet_name='Filtered Data', index=False)
+        trend_bulanan.to_excel(writer, sheet_name='Trend Bulanan', index=False)
+        total_bulanan.to_excel(writer, sheet_name='Total Bulanan', index=False)
 
-        report_text = classification_report(y_test, y_pred, output_dict=False)
-        report_sheet = writer.book.add_worksheet('Classification Report')
-        for i, line in enumerate(report_text.split('\n')):
-            report_sheet.write(i, 0, line)
+        avg_mttr_df = avg_mttr.reset_index()
+        avg_mttr_df.columns = ['RCA', 'Avg MTTR']
+        avg_mttr_df.to_excel(writer, sheet_name='Avg MTTR', index=False)
 
-    output.seek(0)
-    return output
+        pivot.to_excel(writer, sheet_name='Pivot Severity')
+
+        if y_test is not None and y_pred is not None:
+            report_text = classification_report(y_test, y_pred, output_dict=False)
+        else:
+            report_text = "⚠️ Model tidak dijalankan atau tidak ada hasil prediksi karena data tidak mencukupi."
+
+        report_lines = report_text.split('\n')
+        report_df = pd.DataFrame({'Classification Report': report_lines})
+        report_df.to_excel(writer, sheet_name='Classification Report', index=False)
+
+    processed_data = output.getvalue()
+    return processed_data

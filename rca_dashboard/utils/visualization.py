@@ -84,6 +84,36 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     sns.heatmap(pivot_sorted, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
     st.pyplot(fig3)
 
+    def show_sitename_repetition_chart(df):
+    st.subheader("🏢 Distribusi Kemunculan Sitename")
+
+    # Hitung jumlah kemunculan setiap Sitename
+    sitename_counts = df['Sitename'].value_counts().reset_index()
+    sitename_counts.columns = ['Sitename', 'Jumlah']
+
+    # Filter hanya Sitename yang muncul lebih dari sekali
+    repetitif_sites = sitename_counts[sitename_counts['Jumlah'] > 1]
+
+    if repetitif_sites.empty:
+        st.info("Tidak ada Sitename yang muncul lebih dari sekali.")
+        return
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    repetitif_sites.sort_values('Jumlah', ascending=False).plot(
+        x='Sitename',
+        y='Jumlah',
+        kind='bar',
+        ax=ax,
+        color='skyblue'
+    )
+    ax.set_title("Sitename dengan Kemunculan Repetitif (>1)")
+    ax.set_xlabel("Sitename")
+    ax.set_ylabel("Jumlah Kemunculan")
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    st.pyplot(fig)
+    
     st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")
     quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()
     quarterly['year'] = quarterly['quarter'].dt.year

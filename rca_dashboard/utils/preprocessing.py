@@ -14,31 +14,23 @@ def load_and_clean_data(uploaded_file):
 
     df.columns = df.columns.str.strip().str.lower()
 
-        # Definisi selected_cols di sini
     selected_cols = ['createfaultfirstoccurtime', 'severity', 'mttr', 'sub_root_cause', 'subcause', 'slastatus', 'rca', 'sitename']
-
-    # Cek apakah kolom-kolom ini ada
     missing_cols = [col for col in selected_cols if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Kolom berikut tidak ditemukan: {missing_cols}")
-    
-    # Filter kolom yang dibutuhkan
+
     df = df[selected_cols].copy()
-    
-    # Parsing dan pembersihan data
     df['createfaultfirstoccurtime'] = pd.to_datetime(df['createfaultfirstoccurtime'], dayfirst=True, errors='coerce')
     df = df.dropna(subset=['createfaultfirstoccurtime'])
-    
+
     df['severity'] = df['severity'].astype(str).str.strip()
     df['mttr'] = df['mttr'].astype(str).str.replace(',', '.', regex=False)
     df['mttr'] = pd.to_numeric(df['mttr'], errors='coerce')
     df = df.dropna(subset=['mttr'])
-    
-    # Buat label dan urutan bulan
+
     df['bulan_label'] = df['createfaultfirstoccurtime'].dt.strftime('%b %Y')
     df['bulan_sort'] = df['createfaultfirstoccurtime'].dt.to_period('M').dt.to_timestamp()
-    
-    # Simpan salinan untuk analisis lebih lanjut
+
     filtered_df = df.copy()
 
     trend_bulanan = (

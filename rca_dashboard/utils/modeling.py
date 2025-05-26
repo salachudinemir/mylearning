@@ -60,10 +60,12 @@ def show_model_results(filtered_df):
 
     y_pred = model.predict(X_test)
 
+    # Classification Report
     st.text("📄 Classification Report:")
     report = classification_report(y_test, y_pred)
     st.text(report)
-
+    
+    # Confusion_matrix
     cm = confusion_matrix(y_test, y_pred)
     labels = le_dict['rca'].classes_ if 'rca' in le_dict else sorted(filtered_df['rca'].unique())
 

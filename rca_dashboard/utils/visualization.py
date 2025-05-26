@@ -108,44 +108,51 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
             st.warning("Kolom 'circle' tidak ditemukan dalam data. Menampilkan semua data.")
             circle_filtered_df = filtered_df
 
-        # Hitung jumlah kejadian per sitename
+        # Hitung jumlah kejadian per sitename (minimal 3)
         sitename_counts = circle_filtered_df['sitename'].value_counts()
         sitename_counts = sitename_counts[sitename_counts >= 3].reset_index()
         sitename_counts.columns = ['Sitename', 'Jumlah Kejadian']
 
-        # Ambil label bulan untuk masing-masing sitename
-        bulan_per_site = (
-            circle_filtered_df.groupby('sitename')['bulan_label']
-            .apply(lambda x: ', '.join(sorted(set(x), key=lambda b: pd.to_datetime(b, format='%b %Y'))))
-            .reset_index()
-        )
-        bulan_per_site.columns = ['Sitename', 'Bulan Label']
+        # Buat mapping sitename ke circle (ambil circle pertama dari data yang sudah difilter)
+        sitename_to_circle = circle_filtered_df.groupby('sitename')['circle'].first().to_dict()
 
-        # Gabungkan info bulan ke dataframe utama
-        sitename_counts = sitename_counts.merge(bulan_per_site, on='Sitename', how='left')
+        # Tambahkan kolom 'Sitename (Circle)'
+        sitename_counts['Sitename (Circle)'] = sitename_counts['Sitename'].apply(
+            lambda x: f"{x} ({sitename_to_circle.get(x, '-')})"
+        )
+
+        # Fungsi buat label bulan per sitename dengan count per bulan
+        def bulan_label_dengan_count(sitename):
+            df_site = circle_filtered_df[circle_filtered_df['sitename'] == sitename]
+            bulan_counts = df_site['bulan_label'].value_counts()
+            sorted_bulan = sorted(bulan_counts.index, key=lambda b: pd.to_datetime(b, format='%b %Y'))
+            labels = [f"{bulan} ({bulan_counts[bulan]})" for bulan in sorted_bulan]
+            return ', '.join(labels)
+
+        sitename_counts['Bulan Label'] = sitename_counts['Sitename'].apply(bulan_label_dengan_count)
 
         if sitename_counts.empty:
             st.info("Tidak ada site dengan kejadian ≥ 3.")
         else:
             # 🔍 Fitur pencarian site
-            all_sites = sitename_counts['Sitename'].tolist()
+            all_sites = sitename_counts['Sitename (Circle)'].tolist()
             selected_sites = st.multiselect("Cari dan pilih site (opsional):", options=all_sites)
 
             if selected_sites:
-                filtered_sites = sitename_counts[sitename_counts['Sitename'].isin(selected_sites)]
+                filtered_sites = sitename_counts[sitename_counts['Sitename (Circle)'].isin(selected_sites)]
             else:
                 top_n = st.slider("Pilih Top-N Site untuk ditampilkan", min_value=5, max_value=50, value=10)
                 filtered_sites = sitename_counts.head(top_n)
 
-            # 📊 Bar chart dengan label bulan
+            # 📊 Bar chart dengan label bulan dan count per bulan
             fig = px.bar(
                 filtered_sites,
                 x='Jumlah Kejadian',
-                y='Sitename',
+                y='Sitename (Circle)',
                 orientation='h',
-                text='Bulan Label',  # Tampilkan label bulan
+                text='Bulan Label',
                 title="Sitename dengan Jumlah Kasus Terbanyak (≥ 3)",
-                labels={'Jumlah Kejadian': 'Jumlah Kasus', 'Sitename': 'Nama Site'}
+                labels={'Jumlah Kejadian': 'Jumlah Kasus', 'Sitename (Circle)': 'Nama Site'}
             )
             fig.update_traces(textposition='inside', textfont_size=10)
             fig.update_layout(

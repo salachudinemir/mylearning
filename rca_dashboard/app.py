@@ -6,7 +6,7 @@ from utils.modeling import show_model_results
 from utils.exporter import generate_excel_output
 
 st.set_page_config(page_title="RCA Dashboard", layout="wide")
-st.title("📊 Dashboard Root Cause Analysis (RCA) by Salachudin Emir")
+st.title("📊 Dashboard Root Cause Analysis (RCA)")
 
 uploaded_file = st.file_uploader("Unggah file data (CSV / Excel)", type=["csv", "xls", "xlsx"])
 

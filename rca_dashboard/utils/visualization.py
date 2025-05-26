@@ -84,30 +84,36 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     sns.heatmap(pivot_sorted, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
     st.pyplot(fig3)
 
-    def show_sitename_repetition_chart(df):
-    st.subheader("🏢 Distribusi Kemunculan Sitename")
+def show_sitename_repetition_chart(df):
+    st.subheader("🏢 Distribusi Sitename yang Muncul Berulang")
 
-    # Hitung jumlah kemunculan setiap Sitename
     sitename_counts = df['Sitename'].value_counts().reset_index()
     sitename_counts.columns = ['Sitename', 'Jumlah']
 
-    # Filter hanya Sitename yang muncul lebih dari sekali
-    repetitif_sites = sitename_counts[sitename_counts['Jumlah'] > 1]
+    if sitename_counts.empty:
+        st.info("Tidak ada data Sitename untuk divisualisasikan.")
+        return
 
-    if repetitif_sites.empty:
-        st.info("Tidak ada Sitename yang muncul lebih dari sekali.")
+    # Interaktif: Threshold minimum jumlah kemunculan
+    max_jumlah = int(sitename_counts['Jumlah'].max())
+    min_threshold = st.slider("Tampilkan hanya Sitename yang muncul minimal sebanyak:", min_value=1, max_value=max_jumlah, value=2)
+
+    filtered_counts = sitename_counts[sitename_counts['Jumlah'] >= min_threshold]
+
+    if filtered_counts.empty:
+        st.warning("Tidak ada Sitename yang memenuhi ambang batas yang dipilih.")
         return
 
     # Plot
     fig, ax = plt.subplots(figsize=(12, 6))
-    repetitif_sites.sort_values('Jumlah', ascending=False).plot(
+    filtered_counts.sort_values('Jumlah', ascending=False).plot(
         x='Sitename',
         y='Jumlah',
         kind='bar',
         ax=ax,
         color='skyblue'
     )
-    ax.set_title("Sitename dengan Kemunculan Repetitif (>1)")
+    ax.set_title(f"Sitename yang Muncul ≥ {min_threshold} Kali")
     ax.set_xlabel("Sitename")
     ax.set_ylabel("Jumlah Kemunculan")
     plt.xticks(rotation=45, ha='right')

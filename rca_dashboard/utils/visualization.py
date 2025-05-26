@@ -36,9 +36,14 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     trend_bulanan = trend_bulanan.sort_values('date')
 
     fig_trend, ax_trend = plt.subplots(figsize=(12, 6))
+
     for rca_type in trend_bulanan['rca'].unique():
         data_plot = trend_bulanan[trend_bulanan['rca'] == rca_type]
         ax_trend.plot(data_plot['date'], data_plot['count'], marker='o', label=rca_type)
+        
+        # Tambahkan label angka di atas setiap titik
+        for x, y in zip(data_plot['date'], data_plot['count']):
+            ax_trend.text(x, y + 0.5, str(y), ha='center', va='bottom', fontsize=8, rotation=0)
 
     ax_trend.set_xlabel("Bulan")
     ax_trend.set_ylabel("Jumlah Kasus RCA")
@@ -47,6 +52,7 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
     plt.xticks(rotation=45)
     plt.tight_layout()
+
     st.pyplot(fig_trend)
 
     # 2. Visualisasi Distribusi RCA
@@ -87,33 +93,67 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     if 'sitename' not in filtered_df.columns:
         st.warning("Kolom 'sitename' tidak ditemukan dalam data.")
     else:
-        st.subheader("📍 Top Sitename dengan Repetisi Kasus Tertinggi")
+        st.subheader("📍 Top Sitename dengan Repetisi Kasus Tertinggi (Minimal 3x)")
 
-        sitename_counts = filtered_df['sitename'].value_counts().reset_index()
+        # Pastikan kolom 'circle' ada
+        if 'circle' in filtered_df.columns:
+            available_circles = sorted(filtered_df['circle'].dropna().unique())
+            selected_circles = st.multiselect(
+                "Pilih Circle (opsional):",
+                options=available_circles,
+                default=available_circles
+            )
+            circle_filtered_df = filtered_df[filtered_df['circle'].isin(selected_circles)]
+        else:
+            st.warning("Kolom 'circle' tidak ditemukan dalam data. Menampilkan semua data.")
+            circle_filtered_df = filtered_df
+
+        # Hitung jumlah kejadian per sitename
+        sitename_counts = circle_filtered_df['sitename'].value_counts()
+        sitename_counts = sitename_counts[sitename_counts >= 3].reset_index()
         sitename_counts.columns = ['Sitename', 'Jumlah Kejadian']
 
-        # 🔍 Tambahkan fitur pencarian site
-        all_sites = sitename_counts['Sitename'].tolist()
-        selected_sites = st.multiselect("Cari dan pilih site (opsional):", options=all_sites)
-
-        # Filter berdasarkan pilihan user
-        if selected_sites:
-            filtered_sites = sitename_counts[sitename_counts['Sitename'].isin(selected_sites)]
-        else:
-            top_n = st.slider("Pilih Top-N Site untuk ditampilkan", min_value=5, max_value=50, value=10)
-            filtered_sites = sitename_counts.head(top_n)
-
-        # 📊 Visualisasi bar chart
-        fig = px.bar(
-            filtered_sites,
-            x='Jumlah Kejadian',
-            y='Sitename',
-            orientation='h',
-            title=f"Sitename dengan Jumlah Kasus Terbanyak",
-            labels={'Jumlah Kejadian': 'Jumlah Kasus', 'Sitename': 'Nama Site'}
+        # Ambil label bulan untuk masing-masing sitename
+        bulan_per_site = (
+            circle_filtered_df.groupby('sitename')['bulan_label']
+            .apply(lambda x: ', '.join(sorted(set(x), key=lambda b: pd.to_datetime(b, format='%b %Y'))))
+            .reset_index()
         )
-        fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=600)
-        st.plotly_chart(fig, use_container_width=True)
+        bulan_per_site.columns = ['Sitename', 'Bulan Label']
+
+        # Gabungkan info bulan ke dataframe utama
+        sitename_counts = sitename_counts.merge(bulan_per_site, on='Sitename', how='left')
+
+        if sitename_counts.empty:
+            st.info("Tidak ada site dengan kejadian ≥ 3.")
+        else:
+            # 🔍 Fitur pencarian site
+            all_sites = sitename_counts['Sitename'].tolist()
+            selected_sites = st.multiselect("Cari dan pilih site (opsional):", options=all_sites)
+
+            if selected_sites:
+                filtered_sites = sitename_counts[sitename_counts['Sitename'].isin(selected_sites)]
+            else:
+                top_n = st.slider("Pilih Top-N Site untuk ditampilkan", min_value=5, max_value=50, value=10)
+                filtered_sites = sitename_counts.head(top_n)
+
+            # 📊 Bar chart dengan label bulan
+            fig = px.bar(
+                filtered_sites,
+                x='Jumlah Kejadian',
+                y='Sitename',
+                orientation='h',
+                text='Bulan Label',  # Tampilkan label bulan
+                title="Sitename dengan Jumlah Kasus Terbanyak (≥ 3)",
+                labels={'Jumlah Kejadian': 'Jumlah Kasus', 'Sitename': 'Nama Site'}
+            )
+            fig.update_traces(textposition='inside', textfont_size=10)
+            fig.update_layout(
+                yaxis={'categoryorder': 'total ascending'},
+                height=600
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
 
     # 6. Visualisasi Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal
     st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")

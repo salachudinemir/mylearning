@@ -18,6 +18,21 @@ if uploaded_file:
         st.error(f"Terjadi kesalahan saat memproses file: {e}")
         st.stop()
 
+    # # 🔍 Lihat 10 data awal bulan_label
+    # st.write("Contoh nilai kolom 'bulan_label':")
+    # st.write(filtered_df['bulan_label'].dropna().unique()[:10])
+
+    # # ✅ Coba parsing otomatis tanpa format terlebih dahulu untuk menghindari error NaT
+    # filtered_df['bulan_label_dt'] = pd.to_datetime(filtered_df['bulan_label'], errors='coerce')
+
+    # # ❗ Deteksi jika banyak NaT muncul
+    # jumlah_nat = filtered_df['bulan_label_dt'].isna().sum()
+    # st.write(f"Jumlah data yang gagal di-parse (NaT): {jumlah_nat}")
+
+    # # Jika banyak NaT, beri warning
+    # if jumlah_nat > 0:
+    #     st.warning("Beberapa data gagal diubah menjadi tanggal. Periksa format kolom 'bulan_label'.")
+
     # Pastikan kolom 'bulan_label' ada dan ubah ke datetime
     if 'bulan_label' in filtered_df.columns:
         filtered_df['bulan_label_dt'] = pd.to_datetime(filtered_df['bulan_label'], format='%b %Y', errors='coerce')
@@ -56,32 +71,43 @@ if uploaded_file:
     #     st.warning("⚠️ Tidak ada data setelah filter Bulan diterapkan.")
     #     st.stop()
 
-    # Pastikan ada kolom datetime dari bulan_label
+    # Pastikan kolom datetime dari bulan_label sudah dibuat
     filtered_df['bulan_label_dt'] = pd.to_datetime(filtered_df['bulan_label'], format='%b %Y', errors='coerce')
+    filtered_df['tahun'] = filtered_df['bulan_label_dt'].dt.year.astype('Int64')
 
-    # Buat dataframe unik bulan_label dengan kolom datetime
+    # 🔽 Filter Tahun terlebih dahulu
+    available_tahun = sorted(filtered_df['tahun'].dropna().unique())
+    selected_tahun = st.multiselect(
+        "Filter berdasarkan Tahun:",
+        options=available_tahun,
+        default=available_tahun
+    )
+
+    filtered_df = filtered_df[filtered_df['tahun'].isin(selected_tahun)]
+
+    if filtered_df.empty:
+        st.warning("⚠️ Tidak ada data setelah filter Tahun diterapkan.")
+        st.stop()
+
+    # Ambil bulan_label dari tahun yang dipilih
     bulan_label_df = filtered_df[['bulan_label', 'bulan_label_dt']].drop_duplicates()
-
-    # Urutkan dari terlama ke terbaru berdasarkan datetime
     bulan_label_df = bulan_label_df.sort_values('bulan_label_dt')
-
-    # Ambil list bulan_label yang sudah terurut
     available_bulan_label = bulan_label_df['bulan_label'].tolist()
 
-    # Checkbox untuk Select All
-    select_all_bulan = st.checkbox("Pilih Semua Bulan & Tahun", value=True)
+    # 🔽 Filter Bulan dari tahun yang sudah dipilih
+    select_all_bulan = st.checkbox("Pilih Semua Bulan", value=True)
 
     if select_all_bulan:
         selected_bulan_label = st.multiselect(
             "Filter berdasarkan Bulan & Tahun (contoh: Jan 2024):",
             options=available_bulan_label,
-            default=available_bulan_label  # semua otomatis terpilih
+            default=available_bulan_label
         )
     else:
         selected_bulan_label = st.multiselect(
             "Filter berdasarkan Bulan & Tahun (contoh: Jan 2024):",
             options=available_bulan_label,
-            default=[]  # tidak ada yang dipilih defaultnya
+            default=[]
         )
 
     filtered_df = filtered_df[filtered_df['bulan_label'].isin(selected_bulan_label)]
@@ -89,6 +115,34 @@ if uploaded_file:
     if filtered_df.empty:
         st.warning("⚠️ Tidak ada data setelah filter Bulan & Tahun diterapkan.")
         st.stop()
+
+
+    # Filter Circle
+    if 'circle' in filtered_df.columns:
+        available_circles = sorted(filtered_df['circle'].dropna().unique())
+        
+        select_all_circle = st.checkbox("Pilih Semua Circle", value=True)
+        
+        if select_all_circle:
+            selected_circle = st.multiselect(
+                "Filter berdasarkan Circle:",
+                options=available_circles,
+                default=available_circles
+            )
+        else:
+            selected_circle = st.multiselect(
+                "Filter berdasarkan Circle:",
+                options=available_circles,
+                default=[]
+            )
+        
+        filtered_df = filtered_df[filtered_df['circle'].isin(selected_circle)]
+
+        if filtered_df.empty:
+            st.warning("⚠️ Tidak ada data setelah filter Circle diterapkan.")
+            st.stop()
+    else:
+        st.warning("Kolom 'circle' tidak ditemukan di data.")
 
     # Filter Severity
     if 'severity' in filtered_df.columns:

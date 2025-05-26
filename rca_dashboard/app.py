@@ -6,7 +6,7 @@ from utils.modeling import show_model_results
 from utils.exporter import generate_excel_output
 
 st.set_page_config(page_title="RCA Dashboard", layout="wide")
-st.title("📊 Dashboard Root Cause Analysis (RCA)")
+st.title("📊 Dashboard Root Cause Analysis (RCA) by Salachudin Emir")
 
 uploaded_file = st.file_uploader("Unggah file data (CSV / Excel)", type=["csv", "xls", "xlsx"])
 
@@ -161,13 +161,7 @@ if uploaded_file:
     total_bulanan = filtered_df.groupby(['quarter', 'bulan_label']).agg({'total_count': 'sum'}).reset_index()
 
     # Visualisasi
-    #show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan)
-    show_visualizations(filtered_df, avg_mttr, pivot, total_bulanan)
-    from utils.visualization import show_repetitive_sitename
-
-    # Visualisasi Site Repetitif
-    with st.expander("📍 Analisis Repetitive Site (Sitename)", expanded=True):
-        show_repetitive_sitename(filtered_df)
+    show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan)
 
     # Modeling
     y_test, y_pred = show_model_results(filtered_df)

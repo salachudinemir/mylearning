@@ -29,29 +29,31 @@ def sort_pivot_by_severity(pivot_df, severity_order=None):
     return pivot_df.reindex(index=filtered_index, columns=filtered_columns)
 
 
-def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
-    st.subheader("📈 Trend Distribusi RCA per Bulan")
-    trend_bulanan['date'] = pd.to_datetime(trend_bulanan['bulan_label'], format='%b %Y')
-    trend_bulanan = trend_bulanan.sort_values('date')
+def show_repetitive_sitename(filtered_df):
+    st.subheader("📍 Grafik Site dengan Repetisi Tinggi")
 
-    fig_trend, ax_trend = plt.subplots(figsize=(12, 6))
-    
-    for rca_type in trend_bulanan['rca'].unique():
-        data_plot = trend_bulanan[trend_bulanan['rca'] == rca_type]
-        ax_trend.plot(data_plot['date'], data_plot['count'], marker='o', label=rca_type)
+    # Hitung jumlah kemunculan per Sitename
+    sitename_counts = filtered_df['sitename'].value_counts().reset_index()
+    sitename_counts.columns = ['Sitename', 'Jumlah']
 
-        # Tambahkan label angka di tiap titik
-        for x, y in zip(data_plot['date'], data_plot['count']):
-            ax_trend.text(x, y + 0.5, str(y), ha='center', va='bottom', fontsize=9)
+    if sitename_counts.empty:
+        st.info("Tidak ada data Sitename untuk divisualisasikan.")
+        return
 
-    ax_trend.set_xlabel("Bulan")
-    ax_trend.set_ylabel("Jumlah Kasus RCA")
-    ax_trend.set_title("Trend RCA per Bulan")
-    ax_trend.legend(title='RCA', bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    st.pyplot(fig_trend)
+    # Tampilkan hanya 10 Sitename teratas
+    top_sites = sitename_counts.head(10)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.barh(top_sites['Sitename'], top_sites['Jumlah'], color='skyblue')
+    ax.set_xlabel("Jumlah Kemunculan")
+    ax.set_ylabel("Sitename")
+    ax.set_title("Top 10 Sitename dengan Repetisi Kasus Tertinggi")
+    ax.invert_yaxis()
+
+    for i, v in enumerate(top_sites['Jumlah']):
+        ax.text(v + 0.5, i, str(v), va='center')
+
+    st.pyplot(fig)
 
 
     st.subheader("📌 Distribusi RCA")

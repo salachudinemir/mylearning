@@ -4,6 +4,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.dates as mdates
+import plotly.express as px
 
 
 # Fungsi kecil untuk mengurutkan pivot RCA vs Severity
@@ -84,41 +85,27 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     sns.heatmap(pivot_sorted, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
     st.pyplot(fig3)
 
-def show_sitename_repetition_chart(df):
-    st.subheader("🏢 Distribusi Sitename yang Muncul Berulang")
-
-    sitename_counts = df['Sitename'].value_counts().reset_index()
-    sitename_counts.columns = ['Sitename', 'Jumlah']
-
-    if sitename_counts.empty:
-        st.info("Tidak ada data Sitename untuk divisualisasikan.")
+def show_repetitive_sitename(filtered_df):
+    if 'sitename' not in filtered_df.columns:
+        st.warning("Kolom 'Sitename' tidak ditemukan.")
         return
 
-    # Interaktif: Threshold minimum jumlah kemunculan
-    max_jumlah = int(sitename_counts['Jumlah'].max())
-    min_threshold = st.slider("Tampilkan hanya Sitename yang muncul minimal sebanyak:", min_value=1, max_value=max_jumlah, value=2)
+    sitename_counts = filtered_df['sitename'].value_counts().reset_index()
+    sitename_counts.columns = ['Sitename', 'Jumlah Kejadian']
 
-    filtered_counts = sitename_counts[sitename_counts['Jumlah'] >= min_threshold]
+    top_n = st.slider("Tampilkan Top-N Site dengan Repetisi Terbanyak", 5, 50, 10)
 
-    if filtered_counts.empty:
-        st.warning("Tidak ada Sitename yang memenuhi ambang batas yang dipilih.")
-        return
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(12, 6))
-    filtered_counts.sort_values('Jumlah', ascending=False).plot(
-        x='Sitename',
-        y='Jumlah',
-        kind='bar',
-        ax=ax,
-        color='skyblue'
+    fig = px.bar(
+        sitename_counts.head(top_n),
+        x='Jumlah Kejadian',
+        y='Sitename',
+        orientation='h',
+        title=f"Top {top_n} Sitename dengan Kejadian Terbanyak",
+        labels={'Jumlah Kejadian': 'Jumlah Gangguan', 'Sitename': 'Site Name'}
     )
-    ax.set_title(f"Sitename yang Muncul ≥ {min_threshold} Kali")
-    ax.set_xlabel("Sitename")
-    ax.set_ylabel("Jumlah Kemunculan")
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig.update_layout(yaxis={'categoryorder':'total ascending'}, height=600)
+
+    st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")
     quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-st.title("📊 Gabungkan dan Rapihkan Beberapa File Excel / CSV")
+st.title("📊 Gabungkan dan Rapihkan Beberapa File Excel / CSV by Salachudin Emir")
 
 uploaded_files = st.file_uploader(
     "Pilih satu atau beberapa file Excel (.xlsx, .xls) atau CSV (.csv)",

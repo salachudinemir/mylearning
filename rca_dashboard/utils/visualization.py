@@ -3,23 +3,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-import matplotlib.dates as mdates
 import plotly.express as px
-
 
 # Fungsi kecil untuk mengurutkan pivot RCA vs Severity
 def sort_pivot_by_severity(pivot_df, severity_order=None):
-    """
-    Urutkan index dan kolom pivot table berdasarkan severity_order.
-    Jika severity_order tidak diberikan, gunakan urutan default dari index dan kolom pivot.
-
-    Parameters:
-    - pivot_df: pd.DataFrame, pivot RCA vs Severity
-    - severity_order: list of str or None, daftar severity urutan prioritas (opsional)
-
-    Returns:
-    - pd.DataFrame: pivot terurut
-    """
     if severity_order is None:
         severity_order = list(pivot_df.index)
 
@@ -28,34 +15,14 @@ def sort_pivot_by_severity(pivot_df, severity_order=None):
 
     return pivot_df.reindex(index=filtered_index, columns=filtered_columns)
 
+# Fungsi utama visualisasi
+def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
+    show_repetitive_sitename(filtered_df)
+    show_rca_visualizations(filtered_df, avg_mttr, pivot)
+    show_qoq_yoy(total_bulanan)
 
-def show_repetitive_sitename(filtered_df):
-    st.subheader("📍 Grafik Site dengan Repetisi Tinggi")
-
-    # Hitung jumlah kemunculan per Sitename
-    sitename_counts = filtered_df['sitename'].value_counts().reset_index()
-    sitename_counts.columns = ['Sitename', 'Jumlah']
-
-    if sitename_counts.empty:
-        st.info("Tidak ada data Sitename untuk divisualisasikan.")
-        return
-
-    # Tampilkan hanya 10 Sitename teratas
-    top_sites = sitename_counts.head(10)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.barh(top_sites['Sitename'], top_sites['Jumlah'], color='skyblue')
-    ax.set_xlabel("Jumlah Kemunculan")
-    ax.set_ylabel("Sitename")
-    ax.set_title("Top 10 Sitename dengan Repetisi Kasus Tertinggi")
-    ax.invert_yaxis()
-
-    for i, v in enumerate(top_sites['Jumlah']):
-        ax.text(v + 0.5, i, str(v), va='center')
-
-    st.pyplot(fig)
-
-
+# Visualisasi RCA, MTTR, dan heatmap
+def show_rca_visualizations(filtered_df, avg_mttr, pivot):
     st.subheader("📌 Distribusi RCA")
     fig1, ax1 = plt.subplots(figsize=(10, 5))
     countplot = sns.countplot(data=filtered_df, x='rca', order=filtered_df['rca'].value_counts().index, ax=ax1)
@@ -65,36 +32,31 @@ def show_repetitive_sitename(filtered_df):
                      ha='center', va='bottom', fontsize=9)
     st.pyplot(fig1)
 
-    st.subheader("⏱️ MTTR Rata-rata per RCA")
-    fig2, ax2 = plt.subplots(figsize=(10, 5))
-    avg_mttr.plot(kind='bar', ax=ax2)
-    ax2.set_ylabel("MTTR (Mean)")
-    ax2.set_xticklabels(avg_mttr.index, rotation=45)
-    for i, val in enumerate(avg_mttr):
-        ax2.text(i, val, f'{val:.1f}', ha='center', va='bottom', fontsize=9)
-    st.pyplot(fig2)
+    if avg_mttr is not None:
+        st.subheader("⏱️ MTTR Rata-rata per RCA")
+        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        avg_mttr.plot(kind='bar', ax=ax2)
+        ax2.set_ylabel("MTTR (Mean)")
+        ax2.set_xticklabels(avg_mttr.index, rotation=45)
+        for i, val in enumerate(avg_mttr):
+            ax2.text(i, val, f'{val:.1f}', ha='center', va='bottom', fontsize=9)
+        st.pyplot(fig2)
 
-    st.subheader("🔥 Heatmap RCA vs Severity")
+    if pivot is not None:
+        st.subheader("🔥 Heatmap RCA vs Severity")
+        severity_order = ['Emergency', 'Critical', 'Major']
+        pivot_sorted = sort_pivot_by_severity(pivot, severity_order)
+        fig3, ax3 = plt.subplots(figsize=(10, 6))
+        sns.heatmap(pivot_sorted, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
+        st.pyplot(fig3)
 
-    # Tentukan urutan severity
-    severity_order = ['Emergency', 'Critical', 'Major']
-
-    # Urutkan pivot berdasarkan kolom (dan index jika perlu)
-    pivot_sorted = pivot.reindex(columns=severity_order)
-
-    # Buat heatmap dengan data yang sudah diurutkan
-    fig3, ax3 = plt.subplots(figsize=(10, 6))
-    sns.heatmap(pivot_sorted, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
-    st.pyplot(fig3)
-
-def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
-    show_repetitive_sitename(filtered_df)
-
+# Visualisasi site dengan repetisi tertinggi
 def show_repetitive_sitename(filtered_df):
     if 'sitename' not in filtered_df.columns:
-        st.warning("Kolom 'Sitename' tidak ditemukan.")
+        st.warning("Kolom 'sitename' tidak ditemukan.")
         return
 
+    st.subheader("📍 Grafik Site dengan Repetisi Tinggi")
     sitename_counts = filtered_df['sitename'].value_counts().reset_index()
     sitename_counts.columns = ['Sitename', 'Jumlah Kejadian']
 
@@ -108,10 +70,12 @@ def show_repetitive_sitename(filtered_df):
         title=f"Top {top_n} Sitename dengan Kejadian Terbanyak",
         labels={'Jumlah Kejadian': 'Jumlah Gangguan', 'Sitename': 'Site Name'}
     )
-    fig.update_layout(yaxis={'categoryorder':'total ascending'}, height=600)
+    fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=600)
 
     st.plotly_chart(fig, use_container_width=True)
-    
+
+# Visualisasi QOQ & YOY Growth
+def show_qoq_yoy(total_bulanan):
     st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")
     quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()
     quarterly['year'] = quarterly['quarter'].dt.year
@@ -126,26 +90,20 @@ def show_repetitive_sitename(filtered_df):
     data_tahun_lalu['quarter_label'] = 'Q' + data_tahun_lalu['quarter_num'].astype(str)
 
     fig_qoq, ax_qoq = plt.subplots(figsize=(12, 6))
-    ax_qoq.plot(
-        data_tahun_ini['quarter_label'],
-        data_tahun_ini['qoq_growth_%'],
-        marker='o', linestyle='-', color='orange', label=f'QOQ Growth Tahun {tahun_terakhir}'
-    )
-    ax_qoq.plot(
-        data_tahun_lalu['quarter_label'],
-        data_tahun_lalu['qoq_growth_%'],
-        marker='o', linestyle='--', color='gray', label=f'QOQ Growth Tahun {tahun_terakhir - 1}'
-    )
+    ax_qoq.plot(data_tahun_ini['quarter_label'], data_tahun_ini['qoq_growth_%'],
+                marker='o', linestyle='-', color='orange', label=f'QOQ Growth Tahun {tahun_terakhir}')
+    ax_qoq.plot(data_tahun_lalu['quarter_label'], data_tahun_lalu['qoq_growth_%'],
+                marker='o', linestyle='--', color='gray', label=f'QOQ Growth Tahun {tahun_terakhir - 1}')
     ax_qoq.axhline(0, color='gray', linewidth=0.8, linestyle='--')
     ax_qoq.set_xlabel("Kuartal")
     ax_qoq.set_ylabel("QOQ Growth (%)")
     ax_qoq.set_title("Trend QOQ Growth Kasus per Kuartal: Tahun Ini vs Tahun Lalu")
+    ax_qoq.legend()
     plt.xticks(rotation=45)
     plt.grid(True)
-    ax_qoq.legend()
     st.pyplot(fig_qoq)
 
-    st.subheader("📊 Tabel Quarter-over-Quarter (QOQ) Growth per Kuartal")
+    st.subheader("📊 Tabel Quarter-over-Quarter (QOQ) Growth")
     tabel_qoq = pd.merge(
         data_tahun_ini[['quarter_label', 'total_count', 'qoq_growth_%']],
         data_tahun_lalu[['quarter_label', 'total_count', 'qoq_growth_%']],
@@ -153,8 +111,6 @@ def show_repetitive_sitename(filtered_df):
         how='outer',
         suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_terakhir - 1}')
     )
-    tabel_qoq = tabel_qoq.replace('-', np.nan)
-
     st.dataframe(tabel_qoq.style.format({
         f'total_count Tahun {tahun_terakhir}': '{:,.0f}',
         f'qoq_growth_% Tahun {tahun_terakhir}': '{:.2f}%',
@@ -192,7 +148,6 @@ def show_repetitive_sitename(filtered_df):
         how='outer',
         suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_terakhir - 1}')
     )
-
     tabel_yoy['Growth YOY (%)'] = (
         (tabel_yoy[f'total_count Tahun {tahun_terakhir}'] - tabel_yoy[f'total_count Tahun {tahun_terakhir - 1}'])
         / tabel_yoy[f'total_count Tahun {tahun_terakhir - 1}']

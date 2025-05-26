@@ -30,40 +30,108 @@ def sort_pivot_by_severity(pivot_df, severity_order=None):
 
 
 def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
-    # 1. Trend Distribusi RCA per Bulan 
-    st.subheader("📈 Trend Distribusi RCA per Bulan")
-    trend_bulanan['date'] = pd.to_datetime(trend_bulanan['bulan_label'], format='%b %Y')
-    trend_bulanan = trend_bulanan.sort_values('date')
+    # 1. Trend Distribusi per Bulan 
+    st.subheader("📈 Trend Distribusi per Bulan")
+    def show_combined_trend(filtered_df):
+        # Prepare data untuk ketiga tipe trend
+        trend_rca = (
+            filtered_df.groupby(['bulan_label', 'bulan_sort', 'rca'])
+            .size().reset_index(name='count')
+            .sort_values('bulan_sort')
+        )
+        trend_rca['date'] = pd.to_datetime(trend_rca['bulan_label'], format='%b %Y')
 
-    fig_trend, ax_trend = plt.subplots(figsize=(12, 6))
+        trend_circle = (
+            filtered_df.groupby(['bulan_label', 'bulan_sort', 'circle'])
+            .size().reset_index(name='count')
+            .sort_values('bulan_sort')
+        )
+        trend_circle['date'] = pd.to_datetime(trend_circle['bulan_label'], format='%b %Y')
 
-    for rca_type in trend_bulanan['rca'].unique():
-        data_plot = trend_bulanan[trend_bulanan['rca'] == rca_type]
-        ax_trend.plot(data_plot['date'], data_plot['count'], marker='o', label=rca_type)
-        
-        # Tambahkan label angka di atas setiap titik
-        for x, y in zip(data_plot['date'], data_plot['count']):
-            ax_trend.text(x, y + 0.5, str(y), ha='center', va='bottom', fontsize=8, rotation=0)
+        trend_severity = (
+            filtered_df.groupby(['bulan_label', 'bulan_sort', 'severity'])
+            .size().reset_index(name='count')
+            .sort_values('bulan_sort')
+        )
+        trend_severity['date'] = pd.to_datetime(trend_severity['bulan_label'], format='%b %Y')
 
-    ax_trend.set_xlabel("Bulan")
-    ax_trend.set_ylabel("Jumlah Kasus RCA")
-    ax_trend.set_title("Trend RCA per Bulan")
-    ax_trend.legend(title='RCA', bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+        # Dropdown untuk pilih tipe trend
+        pilihan = st.selectbox(
+            "Pilih Trend yang Ingin Ditampilkan:",
+            options=['RCA', 'Circle', 'Severity']
+        )
 
-    st.pyplot(fig_trend)
+        # Tentukan data yang akan dipakai sesuai pilihan
+        if pilihan == 'RCA':
+            data = trend_rca
+            group_col = 'rca'
+            ylabel = "Jumlah Kasus RCA"
+            title = "Trend Distribusi RCA per Bulan"
+        elif pilihan == 'Circle':
+            data = trend_circle
+            group_col = 'circle'
+            ylabel = "Jumlah Kasus Circle"
+            title = "Trend Distribusi Circle per Bulan"
+        else:
+            data = trend_severity
+            group_col = 'severity'
+            ylabel = "Jumlah Kasus Severity"
+            title = "Trend Distribusi Severity per Bulan"
 
-    # 2. Visualisasi Distribusi RCA
-    st.subheader("📌 Distribusi RCA")
-    fig1, ax1 = plt.subplots(figsize=(10, 5))
-    countplot = sns.countplot(data=filtered_df, x='rca', order=filtered_df['rca'].value_counts().index, ax=ax1)
-    ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45)
-    for p in countplot.patches:
-        ax1.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
-                     ha='center', va='bottom', fontsize=9)
-    st.pyplot(fig1)
+        # Plotting
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        for group in data[group_col].unique():
+            subset = data[data[group_col] == group]
+            ax.plot(subset['date'], subset['count'], marker='o', label=group)
+
+            # Label angka di atas titik
+            for x, y in zip(subset['date'], subset['count']):
+                ax.text(x, y + 0.5, str(y), ha='center', va='bottom', fontsize=8, rotation=0)
+
+        ax.set_xlabel("Bulan")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.legend(title=group_col.capitalize(), bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        st.pyplot(fig)
+
+    # Panggil fungsi show_combined_trend di dalam show_visualizations
+    show_combined_trend(filtered_df)
+
+
+    # 2. Visualisasi Distribusi RCA, Circle, atau Severity
+    st.subheader("📌 Distribusi RCA, Circle, atau Severity")
+    def show_distribution(filtered_df):
+        pilihan = st.selectbox(
+            "Pilih distribusi yang ingin ditampilkan:",
+            options=['RCA', 'Circle', 'Severity']
+        )
+
+        kolom = pilihan.lower()
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        order = filtered_df[kolom].value_counts().index
+
+        countplot = sns.countplot(data=filtered_df, x=kolom, order=order, ax=ax)
+        ax.set_xlabel(kolom.capitalize())
+        ax.set_ylabel("Jumlah Kasus")
+        ax.set_title(f"Distribusi {pilihan}")
+
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+
+        for p in countplot.patches:
+            ax.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                         ha='center', va='bottom', fontsize=9)
+
+        plt.tight_layout()
+        st.pyplot(fig)
+
+    show_distribution(filtered_df)
 
     # 3. MTTR Rata-rata per RCA
     st.subheader("⏱️ MTTR Rata-rata per RCA")

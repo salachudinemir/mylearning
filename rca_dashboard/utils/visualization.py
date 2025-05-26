@@ -88,23 +88,33 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
         st.warning("Kolom 'sitename' tidak ditemukan dalam data.")
     else:
         st.subheader("📍 Top Sitename dengan Repetisi Kasus Tertinggi")
+
         sitename_counts = filtered_df['sitename'].value_counts().reset_index()
         sitename_counts.columns = ['Sitename', 'Jumlah Kejadian']
 
-        top_n = st.slider("Pilih Top-N Site untuk ditampilkan", min_value=5, max_value=50, value=10)
-        top_sites = sitename_counts.head(top_n)
+        # 🔍 Tambahkan fitur pencarian site
+        all_sites = sitename_counts['Sitename'].tolist()
+        selected_sites = st.multiselect("Cari dan pilih site (opsional):", options=all_sites)
 
+        # Filter berdasarkan pilihan user
+        if selected_sites:
+            filtered_sites = sitename_counts[sitename_counts['Sitename'].isin(selected_sites)]
+        else:
+            top_n = st.slider("Pilih Top-N Site untuk ditampilkan", min_value=5, max_value=50, value=10)
+            filtered_sites = sitename_counts.head(top_n)
+
+        # 📊 Visualisasi bar chart
         fig = px.bar(
-            top_sites,
+            filtered_sites,
             x='Jumlah Kejadian',
             y='Sitename',
             orientation='h',
-            title=f"Top {top_n} Sitename dengan Jumlah Kasus Terbanyak",
+            title=f"Sitename dengan Jumlah Kasus Terbanyak",
             labels={'Jumlah Kejadian': 'Jumlah Kasus', 'Sitename': 'Nama Site'}
         )
-        fig.update_layout(yaxis={'categoryorder':'total ascending'}, height=600)
+        fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=600)
         st.plotly_chart(fig, use_container_width=True)
-    
+
     # 6. Visualisasi Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal
     st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")
     quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()

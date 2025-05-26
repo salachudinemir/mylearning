@@ -161,7 +161,8 @@ if uploaded_file:
     total_bulanan = filtered_df.groupby(['quarter', 'bulan_label']).agg({'total_count': 'sum'}).reset_index()
 
     # Visualisasi
-    show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan)
+    #show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan)
+    show_visualizations(filtered_df, avg_mttr, pivot, total_bulanan)
     from utils.visualization import show_repetitive_sitename
 
     # Visualisasi Site Repetitif

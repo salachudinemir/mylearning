@@ -34,9 +34,14 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     trend_bulanan = trend_bulanan.sort_values('date')
 
     fig_trend, ax_trend = plt.subplots(figsize=(12, 6))
+    
     for rca_type in trend_bulanan['rca'].unique():
         data_plot = trend_bulanan[trend_bulanan['rca'] == rca_type]
         ax_trend.plot(data_plot['date'], data_plot['count'], marker='o', label=rca_type)
+
+        # Tambahkan label angka di tiap titik
+        for x, y in zip(data_plot['date'], data_plot['count']):
+            ax_trend.text(x, y + 0.5, str(y), ha='center', va='bottom', fontsize=9)
 
     ax_trend.set_xlabel("Bulan")
     ax_trend.set_ylabel("Jumlah Kasus RCA")
@@ -46,6 +51,7 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     plt.xticks(rotation=45)
     plt.tight_layout()
     st.pyplot(fig_trend)
+
 
     st.subheader("📌 Distribusi RCA")
     fig1, ax1 = plt.subplots(figsize=(10, 5))

@@ -87,6 +87,9 @@ def show_repetitive_sitename(filtered_df):
     sns.heatmap(pivot_sorted, annot=True, fmt='d', cmap='YlGnBu', ax=ax3)
     st.pyplot(fig3)
 
+def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan):
+    show_repetitive_sitename(filtered_df)
+
 def show_repetitive_sitename(filtered_df):
     if 'sitename' not in filtered_df.columns:
         st.warning("Kolom 'Sitename' tidak ditemukan.")

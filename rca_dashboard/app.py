@@ -162,12 +162,11 @@ if uploaded_file:
 
     # Visualisasi
     show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulanan)
-    from utils.visualization import show_visualizations, show_sitename_repetition_chart
-    # Visualisasi tambahan: Sitename repetitif
-    if 'Sitename' in filtered_df.columns:
-        show_sitename_repetition_chart(filtered_df)
-    else:
-        st.info("Kolom 'Sitename' tidak tersedia dalam data untuk analisis repetisi.")
+    from utils.visualization import show_repetitive_sitename
+
+    # Visualisasi Site Repetitif
+    with st.expander("📍 Analisis Repetitive Site (Sitename)", expanded=True):
+        show_repetitive_sitename(filtered_df)
 
     # Modeling
     y_test, y_pred = show_model_results(filtered_df)

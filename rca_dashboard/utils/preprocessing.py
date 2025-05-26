@@ -14,7 +14,7 @@ def load_and_clean_data(uploaded_file):
 
     df.columns = df.columns.str.strip().str.lower()
 
-    selected_cols = ['createfaultfirstoccurtime', 'severity', 'mttr', 'sub_root_cause', 'subcause', 'slastatus', 'rca']
+    selected_cols = ['createfaultfirstoccurtime', 'severity', 'mttr', 'sub_root_cause', 'subcause', 'slastatus', 'rca', Sitename]
     missing_cols = [col for col in selected_cols if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Kolom berikut tidak ditemukan: {missing_cols}")

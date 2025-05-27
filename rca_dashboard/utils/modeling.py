@@ -4,7 +4,14 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+)
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -78,7 +85,22 @@ def show_model_results(filtered_df):
     ax.set_title('Confusion Matrix - Random Forest')
     st.pyplot(fig)
 
+    # Accuracy
     acc = accuracy_score(y_test, y_pred)
-    st.success(f"🎯 Akurasi Model Random Forest: {acc:.2%}")
+
+    # Tambahan: Precision, Recall, F1-Score (weighted)
+    precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+    recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+
+    # Tampilkan tabel metrik
+    metrics_df = pd.DataFrame({
+        'Metrik': ['Accuracy', 'Precision (Weighted)', 'Recall (Weighted)', 'F1-Score (Weighted)'],
+        'Nilai': [acc, precision, recall, f1]
+    })
+    metrics_df['Nilai'] = metrics_df['Nilai'].apply(lambda x: f"{x:.2%}")
+
+    st.subheader("📊 Ringkasan Metrik Model")
+    st.table(metrics_df)
 
     return y_test, y_pred

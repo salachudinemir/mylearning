@@ -91,8 +91,16 @@ if uploaded_file:
     available_bulan_label = bulan_label_df['bulan_label'].tolist()
 
     select_all_bulan = st.checkbox("Pilih Semua Bulan", value=True)
-    selected_bulan_label = st.multiselect("Filter berdasarkan Bulan & Tahun:", options=available_bulan_label, default=available_bulan_label if select_all_bulan else [])
+    selected_bulan_label = st.multiselect(
+        "Filter berdasarkan Bulan & Tahun:",
+        options=available_bulan_label,
+        default=available_bulan_label if select_all_bulan else []
+    )
 
+    # Urutkan selected_bulan_label sesuai urutan tanggal (bulan_label_dt)
+    selected_bulan_label = [bl for bl in bulan_label_df['bulan_label'] if bl in selected_bulan_label]
+
+    # Terapkan filter
     filtered_df = filtered_df[filtered_df['bulan_label'].isin(selected_bulan_label)]
     st.write(f"✅ Setelah filter Bulan & Tahun: {len(filtered_df)} baris")
 

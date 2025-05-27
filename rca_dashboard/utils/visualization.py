@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.dates as mdates
 import plotly.express as px
 
-
 # Fungsi kecil untuk mengurutkan pivot RCA vs Severity
 def sort_pivot_by_severity(pivot_df, severity_order=None):
     """
@@ -102,9 +101,9 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     # Panggil fungsi show_combined_trend di dalam show_visualizations
     show_combined_trend(filtered_df)
 
-
     # 2. Visualisasi Distribusi RCA, Circle, atau Severity
     st.subheader("📌 Distribusi RCA, Circle, atau Severity")
+
     def show_distribution(filtered_df):
         pilihan = st.selectbox(
             "Pilih distribusi yang ingin ditampilkan:",
@@ -124,9 +123,14 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
 
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
 
+        # Label angka di dalam bar (tengah vertikal)
         for p in countplot.patches:
-            ax.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
-                         ha='center', va='bottom', fontsize=9)
+            height = p.get_height()
+            ax.annotate(f'{int(height)}',
+                        (p.get_x() + p.get_width() / 2, height / 2),
+                        ha='center', va='center',
+                        fontsize=9,
+                        color='white')
 
         plt.tight_layout()
         st.pyplot(fig)
@@ -139,8 +143,10 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
     avg_mttr.plot(kind='bar', ax=ax2)
     ax2.set_ylabel("MTTR (Mean)")
     ax2.set_xticklabels(avg_mttr.index, rotation=45)
+
     for i, val in enumerate(avg_mttr):
-        ax2.text(i, val, f'{val:.1f}', ha='center', va='bottom', fontsize=9)
+        ax2.text(i, val / 2, f'{val:.1f}', ha='center', va='center', fontsize=9, color='white')
+
     st.pyplot(fig2)
 
     # 4. Visualisasi Heatmap RCA vs Severity
@@ -230,99 +236,185 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
 
             st.plotly_chart(fig, use_container_width=True)
 
-    # 6. Visualisasi Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal
-    st.subheader("📉 Grafik Quarter-over-Quarter (QOQ) Growth per Kuartal")
+    # 6. Grafik Year-over-Year (YOY) Growth per Kuartal
+    st.subheader("📈 Grafik Year-over-Year (YOY) Growth per Kuartal")
+
+    # Proses agregasi per kuartal
     quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()
     quarterly['year'] = quarterly['quarter'].dt.year
     quarterly['quarter_num'] = quarterly['quarter'].dt.quarter
-    quarterly['qoq_growth_%'] = quarterly['total_count'].pct_change() * 100
+    quarterly['quarter_label'] = 'Q' + quarterly['quarter_num'].astype(str)
 
-    tahun_terakhir = quarterly['year'].max()
-    data_tahun_ini = quarterly[quarterly['year'] == tahun_terakhir].copy()
-    data_tahun_lalu = quarterly[quarterly['year'] == tahun_terakhir - 1].copy()
+    # Pivot data
+    pivot_df = quarterly.pivot(index='quarter_num', columns='year', values='total_count')
+    if pivot_df.shape[1] < 2:
+        st.warning("Data kuartal tidak mencukupi untuk analisis YOY.")
+    else:
+        tahun_terakhir = pivot_df.columns.max()
+        tahun_sebelumnya = tahun_terakhir - 1
 
-    data_tahun_ini['quarter_label'] = 'Q' + data_tahun_ini['quarter_num'].astype(str)
-    data_tahun_lalu['quarter_label'] = 'Q' + data_tahun_lalu['quarter_num'].astype(str)
+        if tahun_sebelumnya not in pivot_df.columns or tahun_terakhir not in pivot_df.columns:
+            st.warning("Data tahun sebelumnya atau tahun saat ini tidak lengkap.")
+        else:
+            # Hitung YOY Growth per kuartal
+            pivot_df['yoy_growth_%'] = ((pivot_df[tahun_terakhir] - pivot_df[tahun_sebelumnya]) / pivot_df[tahun_sebelumnya]) * 100
+            pivot_df = pivot_df.reset_index()
+            pivot_df['quarter_label'] = 'Q' + pivot_df['quarter_num'].astype(str)
 
-    fig_qoq, ax_qoq = plt.subplots(figsize=(12, 6))
-    ax_qoq.plot(
-        data_tahun_ini['quarter_label'],
-        data_tahun_ini['qoq_growth_%'],
-        marker='o', linestyle='-', color='orange', label=f'QOQ Growth Tahun {tahun_terakhir}'
-    )
-    ax_qoq.plot(
-        data_tahun_lalu['quarter_label'],
-        data_tahun_lalu['qoq_growth_%'],
-        marker='o', linestyle='--', color='gray', label=f'QOQ Growth Tahun {tahun_terakhir - 1}'
-    )
-    ax_qoq.axhline(0, color='gray', linewidth=0.8, linestyle='--')
-    ax_qoq.set_xlabel("Kuartal")
-    ax_qoq.set_ylabel("QOQ Growth (%)")
-    ax_qoq.set_title("Trend QOQ Growth Kasus per Kuartal: Tahun Ini vs Tahun Lalu")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    ax_qoq.legend()
-    st.pyplot(fig_qoq)
+            # Plot grafik YOY Growth
+            fig_yoy, ax_yoy = plt.subplots(figsize=(10, 5))
+            ax_yoy.plot(pivot_df['quarter_label'], pivot_df['yoy_growth_%'], marker='o', linestyle='-', color='blue')
 
-    # 7. Visualisasi Tabel Quarter-over-Quarter (QOQ) Growth per Kuartal
-    st.subheader("📊 Tabel Quarter-over-Quarter (QOQ) Growth per Kuartal")
-    tabel_qoq = pd.merge(
-        data_tahun_ini[['quarter_label', 'total_count', 'qoq_growth_%']],
-        data_tahun_lalu[['quarter_label', 'total_count', 'qoq_growth_%']],
-        on='quarter_label',
-        how='outer',
-        suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_terakhir - 1}')
-    )
-    tabel_qoq = tabel_qoq.replace('-', np.nan)
+            # Tambahkan garis horizontal 0
+            ax_yoy.axhline(0, color='gray', linestyle='--')
 
-    st.dataframe(tabel_qoq.style.format({
-        f'total_count Tahun {tahun_terakhir}': '{:,.0f}',
-        f'qoq_growth_% Tahun {tahun_terakhir}': '{:.2f}%',
-        f'total_count Tahun {tahun_terakhir - 1}': '{:,.0f}',
-        f'qoq_growth_% Tahun {tahun_terakhir - 1}': '{:.2f}%'
+            # Tambahkan label angka di tiap titik
+            for i, val in enumerate(pivot_df['yoy_growth_%']):
+                if not np.isnan(val):
+                    ax_yoy.text(i, val + max(pivot_df['yoy_growth_%'].max()/50, 1), f"{val:.2f}%", ha='center', fontsize=9, color='blue')
+
+    # Judul dan tampilkan plot
+    fig_yoy, ax_yoy = plt.subplots(figsize=(10, 5))
+    ax_yoy.plot(pivot_df['quarter_label'], pivot_df['yoy_growth_%'], marker='o', linestyle='-', color='blue')
+
+    # Tambahkan garis horizontal nol sebagai referensi
+    ax_yoy.axhline(0, color='gray', linestyle='--')
+
+    # Tambahkan label angka di setiap titik
+    for i, (x, y) in enumerate(zip(pivot_df['quarter_label'], pivot_df['yoy_growth_%'])):
+        if not np.isnan(y):
+            ax_yoy.text(i, y + max(pivot_df['yoy_growth_%'].max() * 0.02, 1), f"{y:.2f}%", 
+                        ha='center', fontsize=9, color='blue')
+
+    # Set judul dan label sumbu
+    ax_yoy.set_title(f"YOY Growth: {tahun_sebelumnya} ke {tahun_terakhir}")
+    ax_yoy.set_ylabel("YOY Growth (%)")
+    ax_yoy.set_xlabel("Kuartal")
+
+    # Tampilkan plot di Streamlit
+    st.pyplot(fig_yoy)
+
+    # Bar Chart Total Count per Kuartal per Tahun
+    st.subheader("📊 Bar Chart: Total Count per Kuartal per Tahun")
+
+    fig_bar, ax_bar = plt.subplots(figsize=(10, 5))
+    x = np.arange(len(pivot_df['quarter_label']))
+    bar_width = 0.35
+
+    bars1 = ax_bar.bar(x - bar_width / 2, pivot_df[tahun_sebelumnya], width=bar_width, label=str(tahun_sebelumnya), color='gray')
+    bars2 = ax_bar.bar(x + bar_width / 2, pivot_df[tahun_terakhir], width=bar_width, label=str(tahun_terakhir), color='orange')
+
+    # Tambahkan label angka di atas bar tahun sebelumnya
+    for bar in bars1:
+        height = bar.get_height()
+        if not np.isnan(height):
+            ax_bar.text(bar.get_x() + bar.get_width()/2, height - height * 0.1, f'{int(height)}',
+                        ha='center', va='bottom', color='white', fontsize=9)
+
+    # Tambahkan label angka di atas bar tahun terakhir
+    for bar in bars2:
+        height = bar.get_height()
+        if not np.isnan(height):
+            ax_bar.text(bar.get_x() + bar.get_width()/2, height - height * 0.1, f'{int(height)}',
+                        ha='center', va='bottom', color='white', fontsize=9)
+
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(pivot_df['quarter_label'])
+    ax_bar.legend()
+    st.pyplot(fig_bar)
+
+
+    # --- Tabel Komparasi Kuartal Terbaru dengan Kuartal Sama Tahun Sebelumnya ---
+    latest_quarter = quarterly['quarter'].max()
+    latest_quarter_num = latest_quarter.quarter
+    latest_year = latest_quarter.year
+    prev_year = latest_year - 1
+
+    count_latest = pivot_df.loc[pivot_df['quarter_num'] == latest_quarter_num, latest_year].values
+    count_prev = pivot_df.loc[pivot_df['quarter_num'] == latest_quarter_num, prev_year].values
+
+    count_latest = count_latest[0] if count_latest.size > 0 else np.nan
+    count_prev = count_prev[0] if count_prev.size > 0 else np.nan
+
+    growth_yoy_latest = ((count_latest - count_prev) / count_prev * 100) if (not np.isnan(count_latest) and not np.isnan(count_prev) and count_prev != 0) else np.nan
+
+    tabel_komparasi = pd.DataFrame({
+        'Kuartal': [f"Q{latest_quarter_num} {latest_year}", f"Q{latest_quarter_num} {prev_year}"],
+        'Total Count': [count_latest, count_prev],
+        'Growth YOY (%)': [np.nan, growth_yoy_latest]
+    })
+
+    # st.subheader("📊 Tabel Komparasi Kuartal Terbaru dengan Kuartal Sama Tahun Sebelumnya")
+    # st.dataframe(tabel_komparasi.style.format({
+    #     'Total Count': '{:,.0f}',
+    #     'Growth YOY (%)': '{:.2f}%'
+    # }))
+
+    # Tabel lengkap per kuartal dengan Growth YOY otomatis
+    pivot_df['Kuartal'] = pivot_df['quarter_label']
+    cols_order = ['Kuartal', tahun_sebelumnya, tahun_terakhir, 'yoy_growth_%']
+    pivot_df = pivot_df[cols_order]
+    pivot_df = pivot_df.rename(columns={'yoy_growth_%': 'Growth YOY (%)'})
+
+    st.subheader("📊 Tabel Komparasi Total Count dan Growth YOY per Kuartal")
+    st.dataframe(pivot_df.style.format({
+        tahun_sebelumnya: '{:,.0f}',
+        tahun_terakhir: '{:,.0f}',
+        'Growth YOY (%)': '{:.2f}%'
     }))
 
-    # 8. Visualisasi Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY)
+    # --- Grafik Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY) ---
     st.subheader("📈 Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY)")
-    tahun_terakhir = int(total_bulanan['bulan_label'].iloc[-1].split()[-1])
+
+    bulan_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    total_bulanan['bulan_short'] = total_bulanan['bulan_label'].str[:3]
+    total_bulanan['bulan_short'] = pd.Categorical(total_bulanan['bulan_short'], categories=bulan_order, ordered=True)
+
     tahun_ini = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir))].copy()
-    tahun_lalu = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_terakhir - 1))].copy()
-
-    bulan_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    tahun_ini['bulan_short'] = pd.Categorical(tahun_ini['bulan_label'].str[:3], categories=bulan_order, ordered=True)
-    tahun_lalu['bulan_short'] = pd.Categorical(tahun_lalu['bulan_label'].str[:3], categories=bulan_order, ordered=True)
-
+    tahun_lalu = total_bulanan[total_bulanan['bulan_label'].str.endswith(str(tahun_sebelumnya))].copy()
     tahun_ini.sort_values('bulan_short', inplace=True)
     tahun_lalu.sort_values('bulan_short', inplace=True)
 
     fig_compare, ax_compare = plt.subplots(figsize=(12, 6))
-    ax_compare.plot(tahun_lalu['bulan_short'], tahun_lalu['total_count'], marker='o', label=f"Tahun {tahun_terakhir - 1}", color='gray')
-    ax_compare.plot(tahun_ini['bulan_short'], tahun_ini['total_count'], marker='o', label=f"Tahun {tahun_terakhir}", color='blue')
-    ax_compare.set_xlabel("Bulan")
-    ax_compare.set_ylabel("Jumlah Kasus")
-    ax_compare.set_title("Komparasi Jumlah Kasus per Bulan: Tahun Ini vs Tahun Lalu")
+
+    # Plot garis tahun lalu
+    ax_compare.plot(tahun_lalu['bulan_short'], tahun_lalu['total_count'], marker='o', label=str(tahun_sebelumnya), color='gray')
+    # Tambahkan label angka untuk tahun lalu
+    for x, y in zip(tahun_lalu['bulan_short'], tahun_lalu['total_count']):
+        if not pd.isna(y):
+            ax_compare.text(x, y + max(tahun_lalu['total_count'].max() / 50, 5), f"{int(y)}", ha='center', fontsize=9, color='gray')
+
+    # Plot garis tahun ini
+    ax_compare.plot(tahun_ini['bulan_short'], tahun_ini['total_count'], marker='o', label=str(tahun_terakhir), color='blue')
+    # Tambahkan label angka untuk tahun ini
+    for x, y in zip(tahun_ini['bulan_short'], tahun_ini['total_count']):
+        if not pd.isna(y):
+            ax_compare.text(x, y + max(tahun_ini['total_count'].max() / 50, 5), f"{int(y)}", ha='center', fontsize=9, color='blue')
+
     ax_compare.legend()
-    plt.grid(True)
+    ax_compare.set_title("Perbandingan Jumlah Kasus Bulanan")
+    ax_compare.set_ylabel("Total Count")
+    ax_compare.set_xlabel("Bulan")
     st.pyplot(fig_compare)
 
-    # 9. Visualisasi Tabel Year-over-Year (YOY) Growth per Bulan
+    # --- Tabel Komparasi Jumlah Kasus Tahun Ini vs Tahun Lalu (YOY) ---
     st.subheader("📊 Tabel Year-over-Year (YOY) Growth per Bulan")
+
     tabel_yoy = pd.merge(
         tahun_ini[['bulan_short', 'total_count']],
         tahun_lalu[['bulan_short', 'total_count']],
-        on='bulan_short',
-        how='outer',
-        suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_terakhir - 1}')
+        on='bulan_short', how='outer',
+        suffixes=(f' Tahun {tahun_terakhir}', f' Tahun {tahun_sebelumnya}')
     )
 
     tabel_yoy['Growth YOY (%)'] = (
-        (tabel_yoy[f'total_count Tahun {tahun_terakhir}'] - tabel_yoy[f'total_count Tahun {tahun_terakhir - 1}'])
-        / tabel_yoy[f'total_count Tahun {tahun_terakhir - 1}']
+        (tabel_yoy[f'total_count Tahun {tahun_terakhir}'] - tabel_yoy[f'total_count Tahun {tahun_sebelumnya}']) /
+        tabel_yoy[f'total_count Tahun {tahun_sebelumnya}']
     ) * 100
-    tabel_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     st.dataframe(tabel_yoy.style.format({
         f'total_count Tahun {tahun_terakhir}': '{:,.0f}',
-        f'total_count Tahun {tahun_terakhir - 1}': '{:,.0f}',
+        f'total_count Tahun {tahun_sebelumnya}': '{:,.0f}',
         'Growth YOY (%)': '{:.2f}%'
     }))

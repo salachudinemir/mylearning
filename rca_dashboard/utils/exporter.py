@@ -6,6 +6,10 @@ def generate_excel_output(filtered_df, trend_bulanan, total_bulanan, avg_mttr, p
     output = io.BytesIO()
 
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        # Hapus kolom yang tidak ingin disimpan
+        cols_to_drop = ['sub_root_cause', 'subcause', 'subcause2']
+        filtered_df = filtered_df.drop(columns=[col for col in cols_to_drop if col in filtered_df.columns])
+
         # Simpan data utama yang telah difilter
         filtered_df.to_excel(writer, sheet_name='Filtered Data', index=False)
 

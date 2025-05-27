@@ -69,7 +69,7 @@ def show_visualizations(filtered_df, trend_bulanan, avg_mttr, pivot, total_bulan
             title = "Trend Distribusi RCA per Bulan"
         elif pilihan == 'Circle':
             data = trend_circle
-            group_col = 'circle'
+            group_col = 'circle'  # Ganti ke huruf kecil
             ylabel = "Jumlah Kasus Circle"
             title = "Trend Distribusi Circle per Bulan"
         else:

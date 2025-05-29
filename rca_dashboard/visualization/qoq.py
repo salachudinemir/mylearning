@@ -4,6 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def show_qoq(total_bulanan):
+    if 'quarter' not in total_bulanan.columns:
+        st.error("Data tidak mengandung kolom 'quarter' yang dibutuhkan untuk QoQ.")
+        return
+
     # --- Proses agregasi data per kuartal ---
     quarterly = total_bulanan.groupby('quarter').agg({'total_count': 'sum'}).reset_index()
     quarterly['year'] = quarterly['quarter'].dt.year
@@ -25,10 +29,8 @@ def show_qoq(total_bulanan):
     fig_qoq, ax_qoq = plt.subplots(figsize=(10, 5))
     ax_qoq.plot(quarterly['quarter_label'], quarterly['growth_qoq_%'], marker='o', linestyle='-', color='green')
 
-    # Garis horizontal nol
     ax_qoq.axhline(0, color='gray', linestyle='--')
 
-    # Label tiap titik
     for i, (x, y) in enumerate(zip(quarterly['quarter_label'], quarterly['growth_qoq_%'])):
         if not np.isnan(y):
             ax_qoq.text(i, y + max(quarterly['growth_qoq_%'].max() * 0.02, 1), f"{y:.2f}%", ha='center', fontsize=9, color='green')
@@ -45,7 +47,6 @@ def show_qoq(total_bulanan):
     fig_bar, ax_bar = plt.subplots(figsize=(10, 5))
     bars = ax_bar.bar(quarterly['quarter_label'], quarterly['total_count'], color='orange')
 
-    # Tambahkan label angka
     for bar in bars:
         height = bar.get_height()
         if not np.isnan(height):
@@ -62,14 +63,16 @@ def show_qoq(total_bulanan):
     if len(quarterly) < 2:
         st.warning("Data tidak cukup untuk menghitung QoQ.")
     else:
-        tabel_komparasi_qoq = quarterly[['quarter_label', 'total_count', 'growth_qoq_%']].copy()
+        tabel_komparasi_qoq = quarterly[['quarter_label', 'total_count', 'total_count_prev', 'growth_qoq_%']].copy()
         tabel_komparasi_qoq = tabel_komparasi_qoq.rename(columns={
             'quarter_label': 'Kuartal',
             'total_count': 'Total Count',
+            'total_count_prev': 'Total Count Kuartal Sebelumnya',
             'growth_qoq_%': 'Growth QoQ (%)'
         })
 
         st.dataframe(tabel_komparasi_qoq.style.format({
             'Total Count': '{:,.0f}',
+            'Total Count Kuartal Sebelumnya': '{:,.0f}',
             'Growth QoQ (%)': '{:.2f}%'
         }))

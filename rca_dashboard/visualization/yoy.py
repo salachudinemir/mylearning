@@ -70,8 +70,37 @@ def show_yoy(total_bulanan):
         tabel_yoy[f'total_count Tahun {tahun_sebelumnya}']
     ) * 100
 
-    st.dataframe(tabel_yoy.style.format({
-        f'total_count Tahun {tahun_terakhir}': '{:,.0f}',
-        f'total_count Tahun {tahun_sebelumnya}': '{:,.0f}',
-        'Growth YOY (%)': '{:.2f}%'
-    }))
+    # Tambah kategori 'None' untuk kolom categorical yang belum punya kategori 'None'
+    for col in tabel_yoy.select_dtypes(['category']).columns:
+        if 'None' not in tabel_yoy[col].cat.categories:
+            tabel_yoy[col] = tabel_yoy[col].cat.add_categories('None')
+
+    # Ganti NaN dengan 'None'
+    tabel_yoy = tabel_yoy.fillna('None')
+
+    # HTML + CSS styling agar font lebih besar dan rapi
+    st.markdown(
+        """
+        <style>
+            .big-font-table {
+                font-size: 18px;
+                border-collapse: collapse;
+                width: 100%;
+            }
+            .big-font-table th, .big-font-table td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            .big-font-table th {
+                background-color: #f2f2f2;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        tabel_yoy.to_html(classes='big-font-table', index=False, escape=False),
+        unsafe_allow_html=True
+    )

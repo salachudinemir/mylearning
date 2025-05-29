@@ -1,7 +1,7 @@
 from .trend import show_trend
 from .distribution import show_distribution
-from .mttr import show_mttr
-from .heatmap import show_heatmap
+from .mttr import show_mttr_per_rca, show_mttr_per_severity, show_mttr_per_circle
+from .heatmap import show_heatmap_rca_vs_severity, show_heatmap_circle_vs_severity
 from .sitename import show_sitename
 from .qoq import show_qoq
 from .yoy import show_yoy

@@ -105,9 +105,10 @@ if uploaded_file:
         for col_name, label in [('circle', 'Circle'), ('severity', 'Severity'), ('rca', 'RCA')]:
             filtered_df = filter_by_column(filtered_df, col_name, label)
 
+        # Pastikan kolom total_count ada sebelum digunakan
         if 'total_count' not in filtered_df.columns:
             filtered_df['total_count'] = 1
-        
+
         # Filter kolom subrootcause
         filtered_df = filter_by_column(filtered_df, 'subrootcause', 'Subrootcause')
 

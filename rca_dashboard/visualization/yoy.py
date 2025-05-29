@@ -13,7 +13,7 @@ def show_yoy(total_bulanan):
     # Pivot data
     pivot_df = quarterly.pivot(index='quarter_num', columns='year', values='total_count')
     if pivot_df.shape[1] < 2:
-        st.warning("Data kuartal tidak mencukupi untuk analisis YOY.")
+        st.warning("Data tidak mencukupi untuk analisis YOY.")
         return
 
     tahun_terakhir = pivot_df.columns.max()

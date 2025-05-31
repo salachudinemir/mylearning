@@ -312,10 +312,9 @@ if uploaded_file:
         else:
             st.warning("Kolom `createtime` tidak tersedia atau data kosong.")
 
-    tab6 = st.tabs(["🏙️ MC Cluster"])[0]
     with tab6:
+        st.subheader("🏙️ Top MC Cluster Berdasarkan Jumlah Insiden")
         plot_mccluster_repetitive(df_filtered_dropped)
-
 
     # Export file Excel pakai fungsi generate_excel_output
     from utils.exporter import generate_excel_output, drop_columns

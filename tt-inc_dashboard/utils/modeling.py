@@ -1,114 +1,157 @@
-import streamlit as st
+import os
 import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+import joblib
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-)
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import json
 
 
-def encode_categorical_columns(df):
-    """Encode semua kolom kategorikal dengan LabelEncoder dan kembalikan dict encoder."""
-    le_dict = {}
-    df_enc = df.copy()
-    for col in df_enc.columns:
-        if df_enc[col].dtype == 'object' or pd.api.types.is_categorical_dtype(df_enc[col]):
-            le = LabelEncoder()
-            df_enc[col] = le.fit_transform(df_enc[col].astype(str))
-            le_dict[col] = le
-    return df_enc, le_dict
+MODEL_PATH = 'saved_model/model.pkl'
+FEATURES_PATH = 'saved_model/model_features.json'
 
 
-def validate_data_for_training(X, y):
-    """Validasi data sebelum training."""
-    if len(X) < 10:
-        st.warning("⚠️ Data terlalu sedikit untuk pelatihan model yang baik.")
-        return False
-    class_counts = y.value_counts()
-    if len(class_counts) < 2:
-        st.warning("⚠️ Data hanya memiliki satu kelas RCA.")
-        return False
-    if (class_counts < 2).any():
-        st.warning("❗ Beberapa kelas RCA hanya memiliki 1 data. Tidak cukup untuk stratifikasi.")
-        st.write(class_counts[class_counts < 2])
-        return False
-    return True
+def train_model(df: pd.DataFrame, force_retrain=False, return_mae=False):
+    if not force_retrain and os.path.exists(MODEL_PATH):
+        model = joblib.load(MODEL_PATH)
+        if return_mae:
+            return model, None
+        return model
 
+    target = 'restoreduration'
+    features = [
+        'severity',
+        'circle',
+        'siteregion',
+        'rootcause',
+        'subcause',
+        'subcause2',
+        'mccluster',
+        'orderid'
+    ]
 
-def plot_confusion_matrix(y_test, y_pred, labels):
-    """Tampilkan confusion matrix dengan heatmap."""
-    cm = confusion_matrix(y_test, y_pred)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=labels, yticklabels=labels, ax=ax)
-    ax.set_xlabel('Predicted')
-    ax.set_ylabel('Actual')
-    ax.set_title('Confusion Matrix - Random Forest')
-    st.pyplot(fig)
+    missing_cols = [col for col in features + [target] if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Kolom berikut tidak ditemukan dalam data: {missing_cols}")
 
+    df = df.dropna(subset=[target])
+    X = df[features]
+    y = df[target]
 
-def show_model_results(filtered_df):
-    if 'rca' not in filtered_df.columns:
-        st.error("Kolom 'rca' tidak ditemukan.")
-        return None, None
+    cat_features = X.select_dtypes(include='object').columns.tolist()
+    num_features = X.select_dtypes(exclude='object').columns.tolist()
 
-    df_enc = filtered_df.dropna(subset=['rca']).copy()
+    preprocessor = ColumnTransformer([
+        ('cat', Pipeline([
+            ('imputer', SimpleImputer(strategy='most_frequent')),
+            ('encoder', OneHotEncoder(handle_unknown='ignore'))
+        ]), cat_features),
+        ('num', SimpleImputer(strategy='median'), num_features)
+    ])
 
-    # Drop kolom datetime jika ada
-    datetime_cols = df_enc.select_dtypes(include=['datetime64[ns]', 'datetime64[ns, UTC]']).columns.tolist()
-    if datetime_cols:
-        df_enc.drop(columns=datetime_cols, inplace=True)
+    model = Pipeline([
+        ('preprocess', preprocessor),
+        ('regressor', RandomForestRegressor(n_estimators=100, random_state=42))
+    ])
 
-    # Encode kolom kategorikal
-    df_enc, le_dict = encode_categorical_columns(df_enc)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-    # Siapkan fitur dan target
-    X = df_enc.drop(columns=['rca', 'bulan_label'], errors='ignore')
-    y = df_enc['rca']
-
-    if not validate_data_for_training(X, y):
-        return None, None
-
-    try:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
-    except Exception as e:
-        st.error(f"Gagal split data: {e}")
-        return None, None
-
-    model = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42)
     model.fit(X_train, y_train)
+
     y_pred = model.predict(X_test)
+    mae = mean_absolute_error(y_test, y_pred)
 
-    st.subheader("📄 Classification Report")
-    st.text(classification_report(y_test, y_pred))
+    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+    joblib.dump(model, MODEL_PATH)
 
-    # Ambil label asli jika ada encoder 'rca', jika tidak ambil langsung
-    labels = le_dict['rca'].classes_ if 'rca' in le_dict else sorted(filtered_df['rca'].unique())
-    plot_confusion_matrix(y_test, y_pred, labels)
+    # Simpan fitur ke file json
+    with open(FEATURES_PATH, 'w') as f:
+        json.dump(features, f)
 
-    # Hitung metrik tambahan
-    acc = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
-    recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
-    f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+    if return_mae:
+        return model, mae
+    else:
+        return model
 
-    metrics_df = pd.DataFrame({
-        'Metrik': ['Accuracy', 'Precision (Weighted)', 'Recall (Weighted)', 'F1-Score (Weighted)'],
-        'Nilai': [acc, precision, recall, f1]
-    })
-    metrics_df['Nilai'] = metrics_df['Nilai'].apply(lambda x: f"{x:.2%}")
 
-    st.subheader("📊 Ringkasan Metrik Model")
-    st.table(metrics_df)
+def load_model():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"Model tidak ditemukan di path: {MODEL_PATH}")
+    model = joblib.load(MODEL_PATH)
+    return model
 
-    return y_test, y_pred
+
+def load_model_features():
+    if not os.path.exists(FEATURES_PATH):
+        return None
+    with open(FEATURES_PATH, 'r') as f:
+        features = json.load(f)
+    return features
+
+
+def predict_duration(model, input_df: pd.DataFrame):
+    preds = model.predict(input_df)
+    return preds
+
+
+def user_input_features(df_filtered_dropped):
+    filtered_df = df_filtered_dropped.copy()
+
+    # Fungsi ini hanya mengembalikan list pilihan untuk UI,
+    # tanpa UI Streamlit di sini supaya modul tetap murni.
+
+    options = {}
+
+    for col in ['orderid', 'severity', 'circle', 'siteregion', 'rootcause', 'subcause', 'subcause2', 'mccluster']:
+        options[col] = filtered_df[col].dropna().unique().tolist()
+        # Jika perlu, opsi bisa difilter satu per satu di UI app
+
+    return options
+
+def evaluate_prediction(df, model):
+    if 'serviceinterruptiontime' not in df.columns:
+        raise ValueError("Kolom 'serviceinterruptiontime' tidak ditemukan untuk evaluasi.")
+
+    def convert_time_to_minutes(time_str):
+        try:
+            h, m = map(int, str(time_str).split(':'))
+            return h * 60 + m
+        except:
+            return None
+
+    df = df.copy()
+    df['actual_minutes'] = df['serviceinterruptiontime'].apply(convert_time_to_minutes)
+
+    if df['actual_minutes'].isnull().all():
+        raise ValueError("Semua nilai 'serviceinterruptiontime' tidak dapat dikonversi ke menit.")
+
+    feature_cols = load_model_features()
+    missing_cols = set(feature_cols) - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"Kolom fitur berikut tidak ditemukan di data evaluasi: {missing_cols}")
+
+    X = df[feature_cols]
+
+    if X.isnull().any().any():
+        raise ValueError("Data fitur evaluasi mengandung NaN, mohon bersihkan atau isi terlebih dahulu.")
+
+    y_true = df['actual_minutes']
+    y_pred = model.predict(X)
+
+    df_result = df.copy()
+    df_result['Predicted_Restore_Duration'] = y_pred
+    df_result['Actual_Service_Interruption'] = y_true
+
+    metrics = {
+        'MAE': mean_absolute_error(y_true, y_pred),
+        'RMSE': mean_squared_error(y_true, y_pred, squared=False),
+        'R2': r2_score(y_true, y_pred)
+    }
+
+    return df_result[['Predicted_Restore_Duration', 'Actual_Service_Interruption']], metrics

@@ -4,7 +4,19 @@ import streamlit as st
 import altair as alt
 import matplotlib.pyplot as plt
 import plotly.express as px
-from utils.preprocessing import load_data, clean_data
+import numpy as np
+from utils.preprocessing import (
+    load_data,
+    clean_data
+)
+from utils.modeling import (
+    train_model,
+    load_model,
+    predict_duration,
+    user_input_features,
+    load_model_features,
+    evaluate_prediction
+)
 from visualization.plots import (
     plot_restore_duration,
     plot_incident_per_region,
@@ -153,25 +165,26 @@ if uploaded_file:
 
     # --- Drop kolom yang tidak ingin ditampilkan di preview & export ---
     columns_to_drop = [
-        "currentoperator_1", "createdat", "closuretime", "restore_duration", "resolve_duration", 
-        "create_duration", "ticketcreatedby", "92", "<1", "10nedownundersite14smg0266_usmanjanatin_mt,mc-semarangkotautara,java", 
-        "fo_ajiznurdin", "5gimpact"
+        "weekno", "nename", "ems", "foowner", "escalatetovendor", "alarmid", "currentoperator", "currentoperator_1", "createdat", "closuretime", "restore_duration", "resolve_duration", 
+        "orderid_1", "circle_id", "subrootcause2", "faultrecoverytime", "faultresolvingtime", "create_duration", "ticketcreatedby", "92", "<1", 
+        "10nedownundersite14smg0266_usmanjanatin_mt,mc-semarangkotautara,java", "fo_ajiznurdin", "5gimpact"
     ]
     cols_exist = [col for col in columns_to_drop if col in df_filtered.columns]
     df_filtered_dropped = df_filtered.drop(columns=cols_exist)
 
-    # Tabs Visualisasi & Tabel
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📍 Per Region",
         "🔥 Root Cause",
         "⏳ Durasi",
         "🚨 SLA Violation",
         "📅 Waktu Teraktif",
-        "🏘️ MC Cluster"
+        "🏘️ MC Cluster",
+        "🤖 Model",
+        "🧪 Debug Filter"
     ])
 
     with tab1:
-        st.subheader("Jumlah Insiden per Region")
+        st.subheader("🗺️ Jumlah Insiden per Region")
         if 'siteregion' in df_filtered_dropped.columns and not df_filtered_dropped.empty:
             fig = plot_incident_per_region(df_filtered_dropped)
             st.pyplot(fig)
@@ -206,14 +219,19 @@ if uploaded_file:
 
     with tab4:
         st.subheader("SLA Violation Pie Chart")
-        if not df_filtered.empty:
+        if not df_filtered.empty and 'slastatus' in df_filtered.columns:
             fig = plot_sla_violation_pie(df_filtered)
             st.pyplot(fig)
         else:
-            st.info("Data kosong untuk SLA Violation.")
+            st.info("Data kosong atau kolom 'slastatus' tidak ditemukan.")
 
         st.subheader("Tabel SLA Violation")
-        st.dataframe(sla_violation_table(df_filtered_dropped))
+
+        # Pastikan df_filtered_dropped punya data sebelum ditampilkan
+        if not df_filtered_dropped.empty:
+            st.dataframe(sla_violation_table(df_filtered_dropped))
+        else:
+            st.info("Data kosong untuk tabel SLA Violation.")
 
     with tab5:
         st.subheader("📈 Trend Jumlah Insiden")
@@ -315,13 +333,120 @@ if uploaded_file:
     with tab6:
         st.subheader("🏙️ Top MC Cluster Berdasarkan Jumlah Insiden")
         plot_mccluster_repetitive(df_filtered_dropped)
+    
+    with tab7:
+        st.subheader("🤖 Modeling Machine Learning")
+
+        force_retrain = st.checkbox("🏋️‍♂️ Latih ulang model", value=False)
+
+        if force_retrain:
+            with st.spinner("Melatih model..."):
+                model, mae = train_model(df_filtered, force_retrain=True, return_mae=True)
+            st.success(f"Model dilatih dengan MAE: {mae:.2f} menit")
+        else:
+            model = train_model(df_filtered, force_retrain=False)
+            st.info("Model dimuat dari file.")
+
+        # --- PREDIKSI (Manual Input)
+        st.subheader("📥 Prediksi Restore Duration (Manual Input)")
+
+        options = user_input_features(df_filtered)
+        
+        filtered_df = df_filtered.copy()
+
+        orderid = st.selectbox("Order ID", options=filtered_df['orderid'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['orderid'] == orderid]
+
+        severity = st.selectbox("Severity", options=filtered_df['severity'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['severity'] == severity]
+
+        circle = st.selectbox("Circle", options=filtered_df['circle'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['circle'] == circle]
+
+        siteregion = st.selectbox("Site Region", options=filtered_df['siteregion'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['siteregion'] == siteregion]
+
+        rootcause = st.selectbox("Root Cause", options=filtered_df['rootcause'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['rootcause'] == rootcause]
+
+        subcause = st.selectbox("Subcause", options=filtered_df['subcause'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['subcause'] == subcause]
+
+        subcause2 = st.selectbox("Subcause 2", options=filtered_df['subcause2'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['subcause2'] == subcause2]
+
+        mccluster = st.selectbox("MC Cluster", options=filtered_df['mccluster'].dropna().unique())
+        filtered_df = filtered_df[filtered_df['mccluster'] == mccluster]
+
+        input_data = pd.DataFrame([{
+            'orderid': orderid,
+            'severity': severity,
+            'circle': circle,
+            'siteregion': siteregion,
+            'rootcause': rootcause,
+            'subcause': subcause,
+            'subcause2': subcause2,
+            'mccluster': mccluster
+        }])
+
+        try:
+            # Load fitur model
+            expected_features = load_model_features()
+
+            # Jika fitur model tidak ditemukan, retrain
+            if expected_features is None:
+                st.warning("Fitur dari model tidak ditemukan. Melatih ulang model...")
+                model, mae = train_model(df_filtered, force_retrain=True, return_mae=True)
+                expected_features = model.named_steps['preprocess'].transformers_[0][2] + model.named_steps['preprocess'].transformers_[1][2]
+                st.success(f"Model dilatih ulang dengan MAE: {mae:.2f}")
+
+            # Cek apakah ada fitur yang hilang di input_data
+            missing_features = set(expected_features) - set(input_data.columns)
+            if missing_features:
+                st.error(f"Fitur berikut tidak ada di input data: {missing_features}")
+            elif input_data.isnull().any().any():
+                st.error("Input data masih mengandung NaN. Pastikan semua kolom diisi dengan benar.")
+            else:
+                # Lakukan prediksi dengan fitur yang sesuai
+                prediction = predict_duration(model, input_data[expected_features])
+                pred_minutes = np.round(prediction[0], 2)
+                hours = int(pred_minutes // 60)
+                minutes = int(pred_minutes % 60)
+
+                st.success(f"Prediksi Restore Duration: {pred_minutes} menit ({hours} jam {minutes} menit)")
+
+            # Evaluasi prediksi (gunakan df_filtered_dropped yang sudah disiapkan sebelumnya)
+            df_eval, metrics = evaluate_prediction(df_filtered_dropped, model)
+
+            st.markdown("#### 📄 Perbandingan Prediksi vs Aktual")
+            st.dataframe(df_eval)
+
+            st.markdown("#### 📈 Metrik Evaluasi")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("MAE", f"{metrics['MAE']:.2f} menit")
+            col2.metric("RMSE", f"{metrics['RMSE']:.2f} menit")
+            col3.metric("R² Score", f"{metrics['R2']:.2f}")
+
+        except ValueError as e:
+            st.warning(f"⚠️ {str(e)}")
+        except Exception as e:
+            st.error(f"❌ Terjadi error saat prediksi atau evaluasi: {e}")
+
+    with tab8:
+        st.subheader("🧪 Debug Data Filter")
+
+        st.markdown("### 🔵 Data Sebelum Filter (df)")
+        st.dataframe(df.head(10))
+        # Debug: tampilkan kolom yang tersedia sebelum difilter
+        st.write("Kolom tersedia di df_filtered:", df.columns.tolist())
+
+        st.markdown("### 🟢 Data Setelah Drop Kolom (df_filtered_dropped)")
+        st.dataframe(df_filtered_dropped.head(10))
+        # # Debug: tampilkan kolom yang tersedia setelah difilter
+        st.write("Kolom tersedia di df_filtered_dropped:", df_filtered_dropped.columns.tolist())
 
     # Export file Excel pakai fungsi generate_excel_output
     from utils.exporter import generate_excel_output, drop_columns
-
-    # Preview Data Setelah Filter
-    st.write("Preview Data Setelah Filter:")
-    st.dataframe(df_filtered.head())
 
     # Drop kolom yg gak mau ditampilkan/export
     df_dropped = drop_columns(df_filtered)

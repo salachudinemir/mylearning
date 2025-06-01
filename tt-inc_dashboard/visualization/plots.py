@@ -49,12 +49,35 @@ def plot_restore_duration(df):
     return fig
 
 def plot_sla_violation_pie(df):
-    if 'sla_violated' not in df.columns:
+    if 'slastatus' not in df.columns:
         return plt.figure()
-    counts = df['sla_violated'].value_counts()
+
+    # Mapping nilai agar lebih jelas
+    status_mapping = {
+        'sla_violation': 'Violated',
+        'normal': 'Met'
+    }
+
+    status_series = df['slastatus'].map(status_mapping)
+
+    counts = status_series.value_counts()
+
+    if len(counts) == 0:
+        return plt.figure()
+    elif len(counts) == 1:
+        # Tambahkan kategori dummy supaya pie chart tetap bisa ditampilkan
+        dummy_label = 'Met' if 'Violated' in counts.index else 'Violated'
+        counts[dummy_label] = 0
+
     fig, ax = plt.subplots(figsize=(6,6))
-    wedges, texts, autotexts = ax.pie(counts, labels=counts.index, autopct='%1.1f%%', colors=['#ff9999','#66b3ff'])
+    wedges, texts, autotexts = ax.pie(
+        counts,
+        labels=counts.index,
+        autopct='%1.1f%%',
+        colors=["#99ffb1", "#ff0755"]
+    )
     ax.set_title("Analisis SLA Violation")
+    fig.tight_layout()
     return fig
 
 def plot_by_circle(df):
@@ -140,8 +163,6 @@ def plot_line_with_labels(series, title="", xlabel="", ylabel=""):
     return fig
 
 def plot_mccluster_repetitive(filtered_df: pd.DataFrame):
-    st.subheader("🏙️ Top MC Cluster Berdasarkan Jumlah Insiden")
-
     if 'mccluster' not in filtered_df.columns or filtered_df.empty:
         st.warning("Data MC Cluster tidak tersedia atau kosong.")
         return

@@ -1,0 +1,6 @@
+streamlit
+pandas
+streamlit-folium
+folium
+openpyxl
+xlrd

@@ -222,3 +222,32 @@ def detect_datetime_column(df):
             df[col] = pd.to_datetime(df[col], errors="coerce")
             return col
     raise KeyError("Kolom waktu tidak ditemukan. Harap sertakan salah satu: createTime")
+
+def apply_time_filter(df, periode, periode_value, month=None, year=None, week=None, quarter=None):
+    """
+    Menghasilkan filter boolean berdasarkan periode.
+    """
+    time_col = detect_datetime_column(df)
+
+    if periode == "month" and month and year:
+        return (df[time_col].dt.month == month) & (df[time_col].dt.year == year)
+
+    elif periode == "week" and week and year:
+        # kalau kamu sudah punya kolom `week` di df
+        if "week" in df.columns:
+            return (df["week"] == f"{year}-W{str(week).zfill(2)}")
+        # fallback pakai pandas
+        return (df[time_col].dt.isocalendar().week == week) & (df[time_col].dt.year == year)
+
+    elif periode == "quarter" and quarter and year:
+        # kalau sudah ada kolom quarter
+        if "quarter" in df.columns:
+            return (df["quarter"] == f"{year}-Q{quarter}")
+        # fallback pakai pandas
+        return (df[time_col].dt.quarter == quarter) & (df[time_col].dt.year == year)
+
+    elif periode == "year" and year:
+        return df[time_col].dt.year == year
+
+    else:
+        return df[time_col].notna()  # fallback, tidak filter
